@@ -20,6 +20,36 @@ Generate English transcripts from YouTube videos, translate them into Korean sub
 - `robotics_glossary.example.txt`: example glossary for technical terms
 - `youtube_transcript_translator/ui/chrome_overlay/`: Chrome extension that overlays packaged Korean subtitles on YouTube
 
+## Pipeline architecture
+
+The repository is structured as a non-realtime batch pipeline:
+
+1. `app/`: CLI entrypoint, config objects, and pipeline orchestration
+2. `sources/`: YouTube downloads, local file loading, and raw source access
+3. `transcript/`: transcript segment models and transcript providers
+4. `normalize/`: cleanup, overlap handling, regrouping, and display-friendly splitting
+5. `glossary/`: glossary loading and placeholder/token protection
+6. `translation/`: replaceable translation backends and backend dispatch
+7. `postprocess/`: restoration, consistency checks, and quality checks
+8. `render/`: SRT/TXT/review/JSON artifact generation
+9. `ui/`: downstream viewer layer only
+
+## Target folder layout
+
+```text
+youtube_transcript_translator/
+  app/
+  sources/
+  transcript/
+  normalize/
+  glossary/
+  translation/
+  postprocess/
+  render/
+  ui/chrome_overlay/
+tests/
+```
+
 ## Install
 
 ```powershell

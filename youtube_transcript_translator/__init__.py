@@ -1,5 +1,5 @@
 """YouTube transcript translation toolkit."""
 
-from .main import main
+from .app.main import main
 
 __all__ = ["main"]
