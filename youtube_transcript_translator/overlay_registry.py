@@ -92,8 +92,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--extension-root",
         type=Path,
-        default=Path(__file__).resolve().parent.parent / "youtube_subtitle_overlay",
-        help="Root of the youtube_subtitle_overlay folder. Default: the repo's extension folder.",
+        default=Path(__file__).resolve().parent / "ui" / "chrome_overlay",
+        help="Root of the chrome overlay folder. Default: the package's extension folder.",
     )
     parser.add_argument("--video-id", required=True, help="YouTube video id.")
     parser.add_argument(

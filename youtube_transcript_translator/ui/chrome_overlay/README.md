@@ -8,7 +8,7 @@ This Chrome extension overlays packaged Korean subtitles on matching YouTube wat
 2. Turn on `Developer mode`.
 3. Choose `Load unpacked`.
 4. Select this folder:
-   - `youtube_subtitle_overlay`
+   - `youtube_transcript_translator/ui/chrome_overlay`
 
 ## Use it
 
@@ -46,4 +46,4 @@ python .\overlay_registry.py `
   --label "Optional title"
 ```
 
-This writes `youtube_subtitle_overlay\subtitles\VIDEO_ID.ko.grouped.srt` and preserves existing registry entries.
+This writes `youtube_transcript_translator\ui\chrome_overlay\subtitles\VIDEO_ID.ko.grouped.srt` and preserves existing registry entries.

@@ -18,7 +18,7 @@ Generate English transcripts from YouTube videos, translate them into Korean sub
 - `overlay_registry.py`: thin CLI entrypoint for extension registration
 - `artifacts/`: local generated transcripts and subtitles
 - `robotics_glossary.example.txt`: example glossary for technical terms
-- `youtube_subtitle_overlay/`: Chrome extension that overlays packaged Korean subtitles on YouTube
+- `youtube_transcript_translator/ui/chrome_overlay/`: Chrome extension that overlays packaged Korean subtitles on YouTube
 
 ## Install
 
@@ -80,11 +80,11 @@ python .\translate_youtube_subtitles.py `
   --transcript-source auto `
   --transcription-backend local `
   --translator google `
-  --extension-root ".\youtube_subtitle_overlay" `
+  --extension-root ".\youtube_transcript_translator\ui\chrome_overlay" `
   --overlay-label "Optional title" `
   --output ".\artifacts\VIDEO_ID.ko.grouped.srt"
 ```
 
 ## Chrome extension
 
-See `youtube_subtitle_overlay/README.md` for loading and usage.
+See `youtube_transcript_translator/ui/chrome_overlay/README.md` for loading and usage.
