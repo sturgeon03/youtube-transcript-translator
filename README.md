@@ -13,7 +13,10 @@ Generate English transcripts from YouTube videos, translate them into Korean sub
 
 ## Project structure
 
-- `translate_youtube_subtitles.py`: transcript, translation, and subtitle generation pipeline
+- `translate_youtube_subtitles.py`: thin CLI entrypoint
+- `youtube_transcript_translator/`: main Python package
+- `overlay_registry.py`: thin CLI entrypoint for extension registration
+- `artifacts/`: local generated transcripts and subtitles
 - `robotics_glossary.example.txt`: example glossary for technical terms
 - `youtube_subtitle_overlay/`: Chrome extension that overlays packaged Korean subtitles on YouTube
 
@@ -33,7 +36,9 @@ python .\translate_youtube_subtitles.py `
   --transcript-source auto `
   --transcription-backend local `
   --translator google `
-  --output ".\VIDEO_ID.ko.grouped.srt"
+  --english-output ".\artifacts\VIDEO_ID.en.srt" `
+  --english-text-output ".\artifacts\VIDEO_ID.en.txt" `
+  --output ".\artifacts\VIDEO_ID.ko.grouped.srt"
 ```
 
 Use OpenAI translation with a glossary:
@@ -47,7 +52,7 @@ python .\translate_youtube_subtitles.py `
   --translator openai `
   --openai-model gpt-5.4-mini `
   --glossary ".\robotics_glossary.example.txt" `
-  --output ".\VIDEO_ID.ko.grouped.srt"
+  --output ".\artifacts\VIDEO_ID.ko.grouped.srt"
 ```
 
 Force OpenAI speech-to-text when YouTube subtitles are unavailable:
@@ -62,9 +67,9 @@ python .\translate_youtube_subtitles.py `
   --transcription-model gpt-4o-transcribe-diarize `
   --translator openai `
   --openai-model gpt-5.4-mini `
-  --english-output ".\VIDEO_ID.en.transcribed.srt" `
-  --english-text-output ".\VIDEO_ID.en.transcribed.txt" `
-  --output ".\VIDEO_ID.ko.grouped.srt"
+  --english-output ".\artifacts\VIDEO_ID.en.transcribed.srt" `
+  --english-text-output ".\artifacts\VIDEO_ID.en.transcribed.txt" `
+  --output ".\artifacts\VIDEO_ID.ko.grouped.srt"
 ```
 
 Register the generated Korean subtitle in the bundled extension automatically:
@@ -77,7 +82,7 @@ python .\translate_youtube_subtitles.py `
   --translator google `
   --extension-root ".\youtube_subtitle_overlay" `
   --overlay-label "Optional title" `
-  --output ".\VIDEO_ID.ko.grouped.srt"
+  --output ".\artifacts\VIDEO_ID.ko.grouped.srt"
 ```
 
 ## Chrome extension
