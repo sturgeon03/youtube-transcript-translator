@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+.env
+.venv/
+*.audio.*
+*.en.srt
+*.en.transcribed.srt
+*.en.transcribed.txt
+*.ko.grouped.srt
+*.ko.grouped.retry-test.srt
+youtube_subtitle_overlay/subtitles/*.srt

@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "YouTube Korean Subtitle Overlay",
+  "version": "0.1.0",
+  "description": "Overlay packaged Korean subtitles on specific YouTube videos.",
+  "permissions": [
+    "storage"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.youtube.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "subtitles/index.json",
+        "subtitles/*.srt"
+      ],
+      "matches": [
+        "https://www.youtube.com/*"
+      ]
+    }
+  ]
+}

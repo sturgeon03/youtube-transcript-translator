@@ -1,0 +1,12 @@
+# source => target
+underactuated robotics => 언더액추에이티드 로보틱스
+feedback equivalence => 피드백 등가성
+equations of motion => 운동 방정식
+trajectory optimization => 궤적 최적화
+reinforcement learning => 강화학습
+imitation learning => 모방학습
+convex optimization => 볼록 최적화
+limit cycle => 극한 주기
+region of attraction => 끌개 영역
+quadruped => 사족보행 로봇
+biped => 이족보행 로봇
