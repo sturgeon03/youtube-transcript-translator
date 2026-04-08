@@ -5,10 +5,11 @@ Generate English transcripts from YouTube videos, translate them into Korean sub
 ## What it does
 
 - Pull English auto subtitles from YouTube when available
-- Fall back to OpenAI speech-to-text when subtitles are missing
+- Fall back to local `faster-whisper` transcription when subtitles are missing
+- Optionally use OpenAI transcription, with chunked retries for long videos
 - Translate grouped subtitle chunks into Korean
 - Save English transcript files and Korean `.srt` output
-- Package generated Korean subtitles into the included Chrome extension
+- Package generated Korean subtitles into the included Chrome extension automatically
 
 ## Project structure
 
@@ -24,12 +25,13 @@ python -m pip install -r requirements.txt
 
 ## Basic usage
 
-Use YouTube auto subtitles when possible:
+Use YouTube auto subtitles when possible, then fall back to local transcription:
 
 ```powershell
 python .\translate_youtube_subtitles.py `
   --url "https://www.youtube.com/watch?v=VIDEO_ID" `
   --transcript-source auto `
+  --transcription-backend local `
   --translator google `
   --output ".\VIDEO_ID.ko.grouped.srt"
 ```
@@ -56,11 +58,25 @@ $env:OPENAI_API_KEY="YOUR_KEY_HERE"
 python .\translate_youtube_subtitles.py `
   --url "https://www.youtube.com/watch?v=VIDEO_ID" `
   --transcript-source transcribe `
+  --transcription-backend openai `
   --transcription-model gpt-4o-transcribe-diarize `
   --translator openai `
   --openai-model gpt-5.4-mini `
   --english-output ".\VIDEO_ID.en.transcribed.srt" `
   --english-text-output ".\VIDEO_ID.en.transcribed.txt" `
+  --output ".\VIDEO_ID.ko.grouped.srt"
+```
+
+Register the generated Korean subtitle in the bundled extension automatically:
+
+```powershell
+python .\translate_youtube_subtitles.py `
+  --url "https://www.youtube.com/watch?v=VIDEO_ID" `
+  --transcript-source auto `
+  --transcription-backend local `
+  --translator google `
+  --extension-root ".\youtube_subtitle_overlay" `
+  --overlay-label "Optional title" `
   --output ".\VIDEO_ID.ko.grouped.srt"
 ```
 

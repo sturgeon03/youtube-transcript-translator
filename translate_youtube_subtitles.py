@@ -6,6 +6,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 import textwrap
 import time
 import uuid
@@ -20,6 +21,9 @@ from urllib.parse import parse_qs, urlparse
 import srt
 from deep_translator import GoogleTranslator
 
+from local_asr import transcribe_audio_with_faster_whisper
+from overlay_registry import register_subtitle
+
 
 DEFAULT_MAX_GROUP_SECONDS = 10.0
 DEFAULT_MAX_GROUP_WORDS = 26
@@ -33,10 +37,16 @@ DEFAULT_OPENAI_REASONING_EFFORT = "low"
 DEFAULT_OPENAI_TIMEOUT_SECONDS = 120.0
 DEFAULT_OPENAI_MAX_BATCH_SIZE = 12
 DEFAULT_TRANSCRIPT_SOURCE = "auto"
+DEFAULT_TRANSCRIPTION_BACKEND = "local"
 DEFAULT_TRANSCRIPTION_MODEL = "gpt-4o-transcribe-diarize"
 DEFAULT_TRANSCRIPTION_LANGUAGE = "en"
 DEFAULT_TRANSCRIPTION_TIMEOUT_SECONDS = 900.0
+DEFAULT_LOCAL_TRANSCRIPTION_MODEL = "small.en"
+DEFAULT_LOCAL_TRANSCRIPTION_DEVICE = "auto"
+DEFAULT_LOCAL_TRANSCRIPTION_COMPUTE_TYPE = "default"
+DEFAULT_TRANSCRIPTION_CHUNK_SECONDS = 600.0
 MAX_AUDIO_UPLOAD_BYTES = 25 * 1024 * 1024
+GLOSSARY_PLACEHOLDER_PREFIX = "ZXQTERM"
 
 
 def parse_args() -> argparse.Namespace:
@@ -96,7 +106,16 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_TRANSCRIPT_SOURCE,
         help=(
             "How to obtain English subtitles for a YouTube URL. "
-            "'auto' tries YouTube subtitles first, then transcription."
+            "'auto' tries YouTube subtitles first, then the selected transcription backend."
+        ),
+    )
+    parser.add_argument(
+        "--transcription-backend",
+        choices=("local", "openai"),
+        default=DEFAULT_TRANSCRIPTION_BACKEND,
+        help=(
+            "Speech-to-text backend used when --transcript-source needs transcription. "
+            f"Default: {DEFAULT_TRANSCRIPTION_BACKEND}."
         ),
     )
     parser.add_argument(
@@ -117,12 +136,45 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--local-transcription-model",
+        default=DEFAULT_LOCAL_TRANSCRIPTION_MODEL,
+        help=(
+            "Local faster-whisper model size or path used when "
+            f"--transcription-backend local. Default: {DEFAULT_LOCAL_TRANSCRIPTION_MODEL}."
+        ),
+    )
+    parser.add_argument(
+        "--local-transcription-device",
+        default=DEFAULT_LOCAL_TRANSCRIPTION_DEVICE,
+        help=(
+            "Device passed to faster-whisper when --transcription-backend local. "
+            f"Default: {DEFAULT_LOCAL_TRANSCRIPTION_DEVICE}."
+        ),
+    )
+    parser.add_argument(
+        "--local-transcription-compute-type",
+        default=DEFAULT_LOCAL_TRANSCRIPTION_COMPUTE_TYPE,
+        help=(
+            "Compute type passed to faster-whisper when --transcription-backend local. "
+            f"Default: {DEFAULT_LOCAL_TRANSCRIPTION_COMPUTE_TYPE}."
+        ),
+    )
+    parser.add_argument(
         "--transcription-timeout-seconds",
         type=float,
         default=DEFAULT_TRANSCRIPTION_TIMEOUT_SECONDS,
         help=(
             "HTTP timeout for OpenAI transcription requests in seconds. "
             f"Default: {DEFAULT_TRANSCRIPTION_TIMEOUT_SECONDS}."
+        ),
+    )
+    parser.add_argument(
+        "--transcription-chunk-seconds",
+        type=float,
+        default=DEFAULT_TRANSCRIPTION_CHUNK_SECONDS,
+        help=(
+            "Chunk size in seconds for long OpenAI transcription fallbacks. "
+            f"Default: {DEFAULT_TRANSCRIPTION_CHUNK_SECONDS}."
         ),
     )
     parser.add_argument(
@@ -174,6 +226,22 @@ def parse_args() -> argparse.Namespace:
             f"Default: {DEFAULT_OPENAI_TIMEOUT_SECONDS}."
         ),
     )
+    parser.add_argument(
+        "--extension-root",
+        type=Path,
+        help=(
+            "Optional path to youtube_subtitle_overlay. When set, the generated Korean "
+            "subtitle is copied into the extension and registered in subtitles/index.json."
+        ),
+    )
+    parser.add_argument(
+        "--video-id",
+        help="Optional explicit video id for extension registration.",
+    )
+    parser.add_argument(
+        "--overlay-label",
+        help="Optional label stored in the extension subtitle registry.",
+    )
     args = parser.parse_args()
     if not args.url and not args.input_path:
         parser.error("Provide either --url or --input.")
@@ -194,6 +262,36 @@ def extract_video_id(url: str) -> str:
     if re.fullmatch(r"[A-Za-z0-9_-]{11}", url):
         return url
     raise ValueError(f"Could not extract a YouTube video ID from: {url}")
+
+
+def format_yt_dlp_timestamp(total_seconds: float) -> str:
+    whole_seconds = max(0, int(total_seconds))
+    hours, remainder = divmod(whole_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return f"{hours:02}:{minutes:02}:{seconds:02}"
+
+
+def format_subprocess_failure(result: subprocess.CompletedProcess[str]) -> str:
+    parts = []
+    stdout = (result.stdout or "").strip()
+    stderr = (result.stderr or "").strip()
+    if stdout:
+        parts.append(stdout)
+    if stderr:
+        parts.append(stderr)
+    return "\n".join(parts).strip()
+
+
+def looks_like_missing_subtitles(message: str) -> bool:
+    lowered = message.lower()
+    patterns = (
+        "no subtitles",
+        "there are no subtitles",
+        "requested subtitles are not available",
+        "requested languages are not available",
+        "has no automatic captions",
+    )
+    return any(pattern in lowered for pattern in patterns)
 
 
 def find_existing_youtube_subtitle_file(video_id: str, target_dir: Path) -> Path | None:
@@ -230,7 +328,14 @@ def try_download_english_auto_subtitles(url: str, target_dir: Path) -> Path | No
         return output_path
     if result.returncode == 0:
         return None
-    return None
+    failure_output = format_subprocess_failure(result)
+    if looks_like_missing_subtitles(failure_output):
+        return None
+    raise RuntimeError(
+        "yt-dlp failed while downloading English auto subtitles.\n"
+        f"URL: {url}\n"
+        f"Details:\n{failure_output or f'Exit code {result.returncode}'}"
+    )
 
 
 def download_english_auto_subtitles(url: str, target_dir: Path) -> Path:
@@ -266,11 +371,96 @@ def download_audio_for_transcription(url: str, target_dir: Path) -> Path:
         "%(id)s.audio.%(ext)s",
         url,
     ]
-    subprocess.run(command, cwd=target_dir, check=True)
+    result = subprocess.run(command, cwd=target_dir, capture_output=True, text=True)
+    if result.returncode != 0:
+        failure_output = format_subprocess_failure(result)
+        raise RuntimeError(
+            "yt-dlp failed while downloading audio for transcription.\n"
+            f"URL: {url}\n"
+            f"Details:\n{failure_output or f'Exit code {result.returncode}'}"
+        )
     output_path = find_downloaded_audio_file(video_id, target_dir)
     if output_path is None:
         raise FileNotFoundError(f"Expected audio file was not created for: {url}")
     return output_path
+
+
+def find_downloaded_audio_section_file(video_id: str, target_dir: Path, section_index: int) -> Path | None:
+    candidates = sorted(target_dir.glob(f"{video_id}.section-{section_index:03d}.audio.*"))
+    if candidates:
+        return candidates[0]
+    return None
+
+
+def download_audio_section_for_transcription(
+    url: str,
+    target_dir: Path,
+    *,
+    start_seconds: float,
+    end_seconds: float,
+    section_index: int,
+) -> Path:
+    video_id = extract_video_id(url)
+    existing_path = find_downloaded_audio_section_file(video_id, target_dir, section_index)
+    if existing_path is not None:
+        return existing_path
+
+    section_start = format_yt_dlp_timestamp(start_seconds)
+    section_end = format_yt_dlp_timestamp(end_seconds)
+    command = [
+        sys.executable,
+        "-m",
+        "yt_dlp",
+        "--no-playlist",
+        "-f",
+        "ba[ext=m4a]/ba[ext=webm]/bestaudio/best",
+        "-S",
+        "+abr,+size",
+        "--download-sections",
+        f"*{section_start}-{section_end}",
+        "-o",
+        f"%(id)s.section-{section_index:03d}.audio.%(ext)s",
+        url,
+    ]
+    result = subprocess.run(command, cwd=target_dir, capture_output=True, text=True)
+    if result.returncode != 0:
+        failure_output = format_subprocess_failure(result)
+        raise RuntimeError(
+            "yt-dlp failed while downloading a chunked audio section.\n"
+            f"URL: {url}\n"
+            f"Chunk: {section_start} - {section_end}\n"
+            f"Details:\n{failure_output or f'Exit code {result.returncode}'}"
+        )
+    output_path = find_downloaded_audio_section_file(video_id, target_dir, section_index)
+    if output_path is None:
+        raise FileNotFoundError(
+            "Expected chunked audio file was not created "
+            f"for {url} [{section_start} - {section_end}]."
+        )
+    return output_path
+
+
+def probe_video_duration_seconds(url: str) -> float | None:
+    command = [
+        sys.executable,
+        "-m",
+        "yt_dlp",
+        "--no-playlist",
+        "--skip-download",
+        "--print",
+        "%(duration)s",
+        url,
+    ]
+    result = subprocess.run(command, capture_output=True, text=True)
+    if result.returncode != 0:
+        return None
+    raw_duration = (result.stdout or "").strip().splitlines()
+    if not raw_duration:
+        return None
+    try:
+        return float(raw_duration[-1])
+    except ValueError:
+        return None
 
 
 def normalize_text(text: str) -> str:
@@ -476,6 +666,46 @@ def load_glossary(path: Path | None) -> dict[str, str]:
             glossary[clean_source] = clean_target
 
     return glossary
+
+
+def glossary_entries_by_priority(glossary: dict[str, str]) -> list[tuple[str, str]]:
+    return sorted(glossary.items(), key=lambda item: (-len(item[0]), item[0].lower()))
+
+
+def glossary_pattern(source: str) -> re.Pattern[str]:
+    if re.fullmatch(r"[A-Za-z0-9]+(?:[ .+-][A-Za-z0-9]+)*", source):
+        return re.compile(rf"\b{re.escape(source)}\b", re.IGNORECASE)
+    return re.compile(re.escape(source), re.IGNORECASE)
+
+
+def mask_glossary_terms(text: str, glossary: dict[str, str]) -> tuple[str, dict[str, str]]:
+    if not glossary:
+        return text, {}
+
+    masked_text = text
+    replacements: dict[str, str] = {}
+    placeholder_index = 0
+
+    for source, target in glossary_entries_by_priority(glossary):
+        pattern = glossary_pattern(source)
+
+        def replacer(match: re.Match[str]) -> str:
+            nonlocal placeholder_index
+            placeholder = f"{GLOSSARY_PLACEHOLDER_PREFIX}{placeholder_index}ZXQ"
+            placeholder_index += 1
+            replacements[placeholder] = target
+            return placeholder
+
+        masked_text = pattern.sub(replacer, masked_text)
+
+    return masked_text, replacements
+
+
+def restore_glossary_terms(text: str, replacements: dict[str, str]) -> str:
+    restored = text
+    for placeholder, target in replacements.items():
+        restored = restored.replace(placeholder, target)
+    return restored
 
 
 def build_openai_translation_instructions(glossary: dict[str, str]) -> str:
@@ -699,15 +929,173 @@ def transcribe_audio_with_openai(
     return parse_transcription_segments(response_data)
 
 
+def offset_subtitles(
+    subtitles: list[srt.Subtitle],
+    *,
+    offset_seconds: float,
+    next_index: int,
+) -> list[srt.Subtitle]:
+    offset = timedelta(seconds=offset_seconds)
+    shifted: list[srt.Subtitle] = []
+    for subtitle in subtitles:
+        shifted.append(
+            srt.Subtitle(
+                index=next_index,
+                start=subtitle.start + offset,
+                end=subtitle.end + offset,
+                content=subtitle.content,
+            )
+        )
+        next_index += 1
+    return shifted
+
+
+def reindex_subtitles(subtitles: list[srt.Subtitle]) -> list[srt.Subtitle]:
+    reindexed: list[srt.Subtitle] = []
+    for index, subtitle in enumerate(subtitles, start=1):
+        reindexed.append(
+            srt.Subtitle(
+                index=index,
+                start=subtitle.start,
+                end=subtitle.end,
+                content=subtitle.content,
+            )
+        )
+    return reindexed
+
+
+def transcribe_openai_url_range(
+    url: str,
+    *,
+    target_dir: Path,
+    start_seconds: float,
+    end_seconds: float,
+    section_index: int,
+    model: str,
+    language: str,
+    api_key: str,
+    timeout_seconds: float,
+    min_split_seconds: float = 60.0,
+) -> tuple[list[srt.Subtitle], int]:
+    chunk_audio_path = download_audio_section_for_transcription(
+        url,
+        target_dir,
+        start_seconds=start_seconds,
+        end_seconds=end_seconds,
+        section_index=section_index,
+    )
+    try:
+        chunk_subtitles = transcribe_audio_with_openai(
+            chunk_audio_path,
+            model=model,
+            language=language,
+            api_key=api_key,
+            timeout_seconds=timeout_seconds,
+        )
+    except ValueError as exc:
+        if "25 MB transcription limit" not in str(exc):
+            raise
+        chunk_length = end_seconds - start_seconds
+        if chunk_length <= min_split_seconds:
+            raise
+        midpoint = start_seconds + chunk_length / 2
+        left_subtitles, next_section_index = transcribe_openai_url_range(
+            url,
+            target_dir=target_dir,
+            start_seconds=start_seconds,
+            end_seconds=midpoint,
+            section_index=section_index + 1,
+            model=model,
+            language=language,
+            api_key=api_key,
+            timeout_seconds=timeout_seconds,
+            min_split_seconds=min_split_seconds,
+        )
+        right_subtitles, next_section_index = transcribe_openai_url_range(
+            url,
+            target_dir=target_dir,
+            start_seconds=midpoint,
+            end_seconds=end_seconds,
+            section_index=next_section_index,
+            model=model,
+            language=language,
+            api_key=api_key,
+            timeout_seconds=timeout_seconds,
+            min_split_seconds=min_split_seconds,
+        )
+        return left_subtitles + right_subtitles, next_section_index
+
+    shifted = offset_subtitles(
+        chunk_subtitles,
+        offset_seconds=start_seconds,
+        next_index=1,
+    )
+    print(
+        "Transcribed audio chunk "
+        f"{section_index}: {format_yt_dlp_timestamp(start_seconds)} - {format_yt_dlp_timestamp(end_seconds)}",
+        flush=True,
+    )
+    return shifted, section_index + 1
+
+
+def transcribe_url_with_openai_chunked(
+    url: str,
+    *,
+    target_dir: Path,
+    model: str,
+    language: str,
+    api_key: str,
+    timeout_seconds: float,
+    chunk_seconds: float,
+) -> list[srt.Subtitle]:
+    if chunk_seconds <= 0:
+        raise ValueError("--transcription-chunk-seconds must be greater than 0.")
+
+    duration_seconds = probe_video_duration_seconds(url)
+    if duration_seconds is None or duration_seconds <= 0:
+        raise RuntimeError(
+            "Could not determine the YouTube video duration required for chunked transcription."
+        )
+
+    combined: list[srt.Subtitle] = []
+    with tempfile.TemporaryDirectory(prefix="yt-transcribe-", dir=target_dir) as temp_dir_raw:
+        temp_dir = Path(temp_dir_raw)
+        chunk_start = 0.0
+        section_index = 1
+
+        while chunk_start < duration_seconds:
+            chunk_end = min(duration_seconds, chunk_start + chunk_seconds)
+            chunk_subtitles, section_index = transcribe_openai_url_range(
+                url,
+                target_dir=temp_dir,
+                start_seconds=chunk_start,
+                end_seconds=chunk_end,
+                section_index=section_index,
+                model=model,
+                language=language,
+                api_key=api_key,
+                timeout_seconds=timeout_seconds,
+            )
+            combined.extend(chunk_subtitles)
+            chunk_start = chunk_end
+
+    return reindex_subtitles(combined)
+
+
 def resolve_subtitles_from_url(
     url: str,
     *,
     target_dir: Path,
     transcript_source: str,
+    transcription_backend: str,
     transcription_model: str,
     transcription_language: str,
+    local_transcription_model: str,
+    local_transcription_device: str,
+    local_transcription_compute_type: str,
     openai_api_key_env: str,
     transcription_timeout_seconds: float,
+    transcription_chunk_seconds: float,
     english_output: Path | None,
     english_text_output: Path | None,
 ) -> tuple[list[srt.Subtitle], Path]:
@@ -735,14 +1123,42 @@ def resolve_subtitles_from_url(
             raise FileNotFoundError(f"No English YouTube subtitles were available for: {url}")
 
     audio_path = download_audio_for_transcription(url, target_dir)
-    api_key = resolve_openai_api_key(openai_api_key_env)
-    subtitles = transcribe_audio_with_openai(
-        audio_path,
-        model=transcription_model,
-        language=transcription_language,
-        api_key=api_key,
-        timeout_seconds=transcription_timeout_seconds,
-    )
+    if transcription_backend == "local":
+        subtitles = transcribe_audio_with_faster_whisper(
+            audio_path,
+            model_size=local_transcription_model,
+            language=transcription_language,
+            device=local_transcription_device,
+            compute_type=local_transcription_compute_type,
+        )
+    elif transcription_backend == "openai":
+        api_key = resolve_openai_api_key(openai_api_key_env)
+        try:
+            subtitles = transcribe_audio_with_openai(
+                audio_path,
+                model=transcription_model,
+                language=transcription_language,
+                api_key=api_key,
+                timeout_seconds=transcription_timeout_seconds,
+            )
+        except ValueError as exc:
+            if "25 MB transcription limit" not in str(exc):
+                raise
+            print(
+                "Audio exceeded the OpenAI upload limit. Retrying with chunked transcription.",
+                flush=True,
+            )
+            subtitles = transcribe_url_with_openai_chunked(
+                url,
+                target_dir=target_dir,
+                model=transcription_model,
+                language=transcription_language,
+                api_key=api_key,
+                timeout_seconds=transcription_timeout_seconds,
+                chunk_seconds=transcription_chunk_seconds,
+            )
+    else:
+        raise ValueError(f"Unsupported transcription backend: {transcription_backend}")
 
     english_srt_path = english_output.resolve() if english_output else default_transcribed_english_srt_path(video_id, target_dir)
     english_txt_path = (
@@ -1063,16 +1479,28 @@ def translate_batch_google(translator: GoogleTranslator, texts: list[str]) -> li
         return translated
 
 
-def translate_groups_google(groups: list[srt.Subtitle], wrap_width: int, batch_size: int) -> list[srt.Subtitle]:
+def translate_groups_google(
+    groups: list[srt.Subtitle],
+    *,
+    wrap_width: int,
+    batch_size: int,
+    glossary: dict[str, str],
+) -> list[srt.Subtitle]:
     translator = GoogleTranslator(source="en", target="ko")
     translated: list[srt.Subtitle] = []
     next_index = 1
 
     for offset in range(0, len(groups), batch_size):
         batch = groups[offset : offset + batch_size]
-        batch_texts = [group.content for group in batch]
-        translated_texts = translate_batch_google(translator, batch_texts)
-        for group, text in zip(batch, translated_texts):
+        masked_batch: list[str] = []
+        replacements_per_text: list[dict[str, str]] = []
+        for group in batch:
+            masked_text, replacements = mask_glossary_terms(group.content, glossary)
+            masked_batch.append(masked_text)
+            replacements_per_text.append(replacements)
+        translated_texts = translate_batch_google(translator, masked_batch)
+        for group, text, replacements in zip(batch, translated_texts, replacements_per_text):
+            text = restore_glossary_terms(text, replacements)
             clean_text = normalize_text(text)
             clean_text = wrap_korean_text(clean_text, wrap_width)
             translated.append(
@@ -1092,9 +1520,7 @@ def translate_groups_google(groups: list[srt.Subtitle], wrap_width: int, batch_s
 def resolve_openai_api_key(env_name: str) -> str:
     api_key = os.environ.get(env_name, "").strip()
     if not api_key:
-        raise ValueError(
-            f"OpenAI translator selected, but environment variable {env_name} is not set."
-        )
+        raise ValueError(f"OpenAI API use requires environment variable {env_name} to be set.")
     return api_key
 
 
@@ -1167,7 +1593,12 @@ def translate_groups(
             api_key_env=openai_api_key_env,
             timeout_seconds=openai_timeout_seconds,
         )
-    return translate_groups_google(groups, wrap_width=wrap_width, batch_size=batch_size)
+    return translate_groups_google(
+        groups,
+        wrap_width=wrap_width,
+        batch_size=batch_size,
+        glossary=glossary,
+    )
 
 
 def default_output_path(input_srt: Path) -> Path:
@@ -1203,10 +1634,15 @@ def main() -> None:
             args.url,
             target_dir=target_dir,
             transcript_source=args.transcript_source,
+            transcription_backend=args.transcription_backend,
             transcription_model=args.transcription_model,
             transcription_language=args.transcription_language,
+            local_transcription_model=args.local_transcription_model,
+            local_transcription_device=args.local_transcription_device,
+            local_transcription_compute_type=args.local_transcription_compute_type,
             openai_api_key_env=args.openai_api_key_env,
             transcription_timeout_seconds=args.transcription_timeout_seconds,
+            transcription_chunk_seconds=args.transcription_chunk_seconds,
             english_output=args.english_output,
             english_text_output=args.english_text_output,
         )
@@ -1233,18 +1669,38 @@ def main() -> None:
     )
     output_path.write_text(srt.compose(translated), encoding="utf-8-sig")
 
+    registered_overlay_path: Path | None = None
+    if args.extension_root is not None:
+        registration_video_id = args.video_id or (extract_video_id(args.url) if args.url else None)
+        if not registration_video_id:
+            raise ValueError(
+                "--extension-root requires --video-id when the input is not a YouTube URL."
+            )
+        registered_overlay_path = register_subtitle(
+            args.extension_root.resolve(),
+            registration_video_id,
+            output_path,
+            label=args.overlay_label,
+        )
+
     print(f"English input: {input_reference}")
     print(f"Grouped entries: {len(grouped)}")
     print(f"Translator: {args.translator}")
     if args.url:
         print(f"Transcript source: {args.transcript_source}")
         if input_reference.name.endswith(".en.transcribed.srt"):
-            print(f"Transcription model: {args.transcription_model}")
+            print(f"Transcription backend: {args.transcription_backend}")
+            if args.transcription_backend == "local":
+                print(f"Local transcription model: {args.local_transcription_model}")
+            else:
+                print(f"Transcription model: {args.transcription_model}")
     if args.translator == "openai":
         print(f"OpenAI model: {args.openai_model}")
     if glossary:
         print(f"Glossary entries: {len(glossary)}")
     print(f"Korean output: {output_path}")
+    if registered_overlay_path is not None:
+        print(f"Overlay subtitle: {registered_overlay_path}")
 
 
 if __name__ == "__main__":

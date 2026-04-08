@@ -8,7 +8,7 @@ This Chrome extension overlays packaged Korean subtitles on matching YouTube wat
 2. Turn on `Developer mode`.
 3. Choose `Load unpacked`.
 4. Select this folder:
-   - `C:\Users\sym89\Desktop\통번역\youtube_subtitle_overlay`
+   - `youtube_subtitle_overlay`
 
 ## Use it
 
@@ -34,3 +34,16 @@ This Chrome extension overlays packaged Korean subtitles on matching YouTube wat
   }
 }
 ```
+
+## Register a generated subtitle file
+
+From the repo root, copy a Korean SRT into the extension and update `index.json` with:
+
+```powershell
+python .\overlay_registry.py `
+  --video-id "VIDEO_ID" `
+  --subtitle ".\VIDEO_ID.ko.grouped.srt" `
+  --label "Optional title"
+```
+
+This writes `youtube_subtitle_overlay\subtitles\VIDEO_ID.ko.grouped.srt` and preserves existing registry entries.
