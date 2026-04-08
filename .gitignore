@@ -4,8 +4,10 @@ __pycache__/
 .venv/
 *.audio.*
 *.en.srt
+*.en.txt
 *.en.transcribed.srt
 *.en.transcribed.txt
 *.ko.grouped.srt
+*.ko.grouped.readable.srt
 *.ko.grouped.retry-test.srt
 youtube_subtitle_overlay/subtitles/*.srt

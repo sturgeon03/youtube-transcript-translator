@@ -25,10 +25,10 @@ from local_asr import transcribe_audio_with_faster_whisper
 from overlay_registry import register_subtitle
 
 
-DEFAULT_MAX_GROUP_SECONDS = 10.0
-DEFAULT_MAX_GROUP_WORDS = 26
-DEFAULT_MAX_GAP_SECONDS = 0.9
-DEFAULT_WRAP_WIDTH = 28
+DEFAULT_MAX_GROUP_SECONDS = 7.0
+DEFAULT_MAX_GROUP_WORDS = 18
+DEFAULT_MAX_GAP_SECONDS = 0.75
+DEFAULT_WRAP_WIDTH = 24
 DEFAULT_BATCH_SIZE = 40
 DEFAULT_TEXT_BLOCK_SECONDS = 4.0
 DEFAULT_TRANSLATOR = "google"
@@ -47,6 +47,8 @@ DEFAULT_LOCAL_TRANSCRIPTION_COMPUTE_TYPE = "default"
 DEFAULT_TRANSCRIPTION_CHUNK_SECONDS = 600.0
 MAX_AUDIO_UPLOAD_BYTES = 25 * 1024 * 1024
 GLOSSARY_PLACEHOLDER_PREFIX = "ZXQTERM"
+DEFAULT_MAX_DISPLAY_LINES = 2
+DEFAULT_MIN_SPLIT_SECONDS = 1.4
 
 
 def parse_args() -> argparse.Namespace:
@@ -1340,7 +1342,7 @@ def regroup_subtitles(
             continue
 
         if should_split_group(
-            current_text=current_text,
+            current_text=candidate_text,
             current_start=current_start.total_seconds(),
             previous_end=current_end.total_seconds(),
             next_start=start_seconds,
@@ -1383,10 +1385,189 @@ def regroup_subtitles(
 
 
 def wrap_korean_text(text: str, width: int) -> str:
-    if len(text) <= width:
-        return text
-    wrapped = textwrap.fill(text, width=width, break_long_words=False, break_on_hyphens=False)
+    normalized = normalize_text(text)
+    if len(normalized) <= width:
+        return normalized
+
+    word_parts = words(normalized)
+    if len(word_parts) >= 4:
+        best_split = None
+        best_score = None
+        for index in range(1, len(word_parts)):
+            left = " ".join(word_parts[:index]).strip()
+            right = " ".join(word_parts[index:]).strip()
+            if not left or not right:
+                continue
+            max_length = max(len(left), len(right))
+            overflow_penalty = max(0, max_length - width) * 3
+            score = abs(len(left) - len(right)) + overflow_penalty
+            if best_score is None or score < best_score:
+                best_score = score
+                best_split = (left, right)
+        if best_split is not None and max(len(best_split[0]), len(best_split[1])) <= width + 6:
+            return f"{best_split[0]}\n{best_split[1]}"
+
+    wrapped = textwrap.fill(
+        normalized,
+        width=width,
+        break_long_words=False,
+        break_on_hyphens=False,
+    )
     return wrapped
+
+
+def wrapped_lines(text: str, width: int) -> list[str]:
+    normalized = normalize_text(text)
+    if not normalized:
+        return []
+    wrapped = wrap_korean_text(normalized, width)
+    return [line.strip() for line in wrapped.splitlines() if line.strip()]
+
+
+def split_text_by_words(text: str, max_chars: int) -> list[str]:
+    word_parts = words(text)
+    if not word_parts:
+        return []
+
+    chunks: list[str] = []
+    current_words: list[str] = []
+
+    for word in word_parts:
+        candidate_words = current_words + [word]
+        candidate_text = " ".join(candidate_words).strip()
+        if current_words and len(candidate_text) > max_chars:
+            chunks.append(" ".join(current_words).strip())
+            current_words = [word]
+            continue
+        current_words = candidate_words
+        if len(candidate_text) >= int(max_chars * 0.6) and re.search(r"[.!?,:;)]$", word):
+            chunks.append(candidate_text)
+            current_words = []
+
+    if current_words:
+        chunks.append(" ".join(current_words).strip())
+    return [chunk for chunk in chunks if chunk]
+
+
+def split_text_by_char_limit(text: str, max_chars: int) -> list[str]:
+    normalized = normalize_text(text)
+    if not normalized:
+        return []
+    if " " in normalized:
+        return split_text_by_words(normalized, max_chars)
+
+    parts = textwrap.wrap(
+        normalized,
+        width=max_chars,
+        break_long_words=True,
+        break_on_hyphens=False,
+    )
+    return [part.strip() for part in parts if part.strip()]
+
+
+def split_text_for_display(
+    text: str,
+    *,
+    wrap_width: int,
+    max_lines: int = DEFAULT_MAX_DISPLAY_LINES,
+) -> list[str]:
+    normalized = normalize_text(text)
+    if not normalized:
+        return []
+
+    if len(wrapped_lines(normalized, wrap_width)) <= max_lines:
+        return [normalized]
+
+    max_chars = max(wrap_width * max_lines - 2, wrap_width + 8)
+    chunks = split_text_by_words(normalized, max_chars)
+    if not chunks:
+        chunks = [normalized]
+
+    refined: list[str] = []
+    for chunk in chunks:
+        if len(wrapped_lines(chunk, wrap_width)) <= max_lines:
+            refined.append(chunk)
+            continue
+        refined.extend(split_text_by_char_limit(chunk, max(wrap_width + 2, max_chars // 2)))
+
+    return [chunk for chunk in refined if chunk]
+
+
+def reduce_chunk_count_to_fit_duration(
+    chunks: list[str],
+    *,
+    duration_seconds: float,
+    min_split_seconds: float = DEFAULT_MIN_SPLIT_SECONDS,
+) -> list[str]:
+    if len(chunks) <= 1:
+        return chunks
+    max_chunk_count = max(1, int(duration_seconds // min_split_seconds))
+    if max_chunk_count >= len(chunks):
+        return chunks
+    return merge_text_segments(chunks, max_chunk_count)
+
+
+def allocate_subtitle_durations(chunks: list[str], total_duration: float) -> list[float]:
+    if not chunks:
+        return []
+    if len(chunks) == 1:
+        return [max(total_duration, 0.01)]
+
+    weights = [max(len(re.sub(r"\s+", "", chunk)), 1) for chunk in chunks]
+    remaining_duration = max(total_duration, 0.01)
+    remaining_weight = sum(weights)
+    allocated: list[float] = []
+
+    for index, weight in enumerate(weights):
+        remaining_chunks = len(weights) - index
+        if remaining_chunks == 1:
+            allocated.append(remaining_duration)
+            break
+
+        min_remaining = 0.7 * (remaining_chunks - 1)
+        raw_duration = remaining_duration * (weight / remaining_weight)
+        duration = max(0.7, raw_duration)
+        duration = min(duration, remaining_duration - min_remaining)
+        allocated.append(duration)
+        remaining_duration -= duration
+        remaining_weight -= weight
+
+    return allocated
+
+
+def build_display_friendly_subtitles(
+    subtitle: srt.Subtitle,
+    *,
+    text: str,
+    wrap_width: int,
+    start_index: int,
+) -> list[srt.Subtitle]:
+    normalized = normalize_text(text)
+    if not normalized:
+        return []
+
+    total_duration = max((subtitle.end - subtitle.start).total_seconds(), 0.01)
+    chunks = split_text_for_display(normalized, wrap_width=wrap_width)
+    chunks = reduce_chunk_count_to_fit_duration(chunks, duration_seconds=total_duration)
+    durations = allocate_subtitle_durations(chunks, total_duration)
+
+    built: list[srt.Subtitle] = []
+    current_start = subtitle.start
+    for offset, (chunk, duration_seconds) in enumerate(zip(chunks, durations), start=0):
+        if offset == len(chunks) - 1:
+            current_end = subtitle.end
+        else:
+            current_end = current_start + seconds_to_timedelta(duration_seconds)
+        built.append(
+            srt.Subtitle(
+                index=start_index + offset,
+                start=current_start,
+                end=max(current_end, current_start + seconds_to_timedelta(0.01)),
+                content=wrap_korean_text(chunk, wrap_width),
+            )
+        )
+        current_start = current_end
+    return built
 
 
 def merge_text_segments(parts: list[str], target_count: int = 2) -> list[str]:
@@ -1501,17 +1682,14 @@ def translate_groups_google(
         translated_texts = translate_batch_google(translator, masked_batch)
         for group, text, replacements in zip(batch, translated_texts, replacements_per_text):
             text = restore_glossary_terms(text, replacements)
-            clean_text = normalize_text(text)
-            clean_text = wrap_korean_text(clean_text, wrap_width)
-            translated.append(
-                srt.Subtitle(
-                    index=next_index,
-                    start=group.start,
-                    end=group.end,
-                    content=clean_text,
-                )
+            built_subtitles = build_display_friendly_subtitles(
+                group,
+                text=text,
+                wrap_width=wrap_width,
+                start_index=next_index,
             )
-            next_index += 1
+            translated.extend(built_subtitles)
+            next_index += len(built_subtitles)
         print(f"Translated {min(offset + batch_size, len(groups))}/{len(groups)} groups", flush=True)
         time.sleep(0.4)
     return translated
@@ -1551,17 +1729,14 @@ def translate_groups_openai(
             timeout_seconds=timeout_seconds,
         )
         for group, text in zip(batch, translated_texts):
-            clean_text = normalize_text(text)
-            clean_text = wrap_korean_text(clean_text, wrap_width)
-            translated.append(
-                srt.Subtitle(
-                    index=next_index,
-                    start=group.start,
-                    end=group.end,
-                    content=clean_text,
-                )
+            built_subtitles = build_display_friendly_subtitles(
+                group,
+                text=text,
+                wrap_width=wrap_width,
+                start_index=next_index,
             )
-            next_index += 1
+            translated.extend(built_subtitles)
+            next_index += len(built_subtitles)
         print(
             f"Translated {min(offset + effective_batch_size, len(groups))}/{len(groups)} groups",
             flush=True,

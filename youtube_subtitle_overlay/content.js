@@ -11,19 +11,19 @@
   const SIZE_PRESETS = {
     compact: {
       fontSize: "clamp(18px, 1.5vw, 25px)",
-      maxWidth: "56%",
+      maxWidth: "64%",
       padding: "8px 12px",
       lineHeight: "1.3",
     },
     comfortable: {
       fontSize: "clamp(20px, 1.8vw, 29px)",
-      maxWidth: "62%",
+      maxWidth: "70%",
       padding: "10px 14px",
       lineHeight: "1.35",
     },
     large: {
       fontSize: "clamp(22px, 2.1vw, 33px)",
-      maxWidth: "68%",
+      maxWidth: "76%",
       padding: "12px 16px",
       lineHeight: "1.38",
     },
@@ -239,6 +239,8 @@
         fontWeight: "700",
         textAlign: "center",
         whiteSpace: "pre-line",
+        wordBreak: "keep-all",
+        overflowWrap: "normal",
         pointerEvents: "none",
         zIndex: "60",
         opacity: "0",
