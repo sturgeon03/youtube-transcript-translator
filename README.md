@@ -88,6 +88,14 @@ python .\run_ui.py
 
 Then open [http://127.0.0.1:8000](http://127.0.0.1:8000) if the browser does not open automatically.
 
+To run the UI on a separate GPU PC and connect from a laptop browser on the same network:
+
+```powershell
+python .\run_ui.py --host 0.0.0.0 --port 8000 --no-browser
+```
+
+The server prints both the local URL and the detected LAN URL. Open the `http://GPU_PC_LAN_IP:8000` address from the laptop browser. If Windows prompts for firewall access, allow Python on the chosen network.
+
 The UI currently supports:
 
 - YouTube URL input
