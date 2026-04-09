@@ -10,7 +10,7 @@ from ..normalize.regroup import merge_text_segments
 from ..normalize.text_cleaner import normalize_text, words
 from ..postprocess.restore import restore_translation_text
 from ..transcript.models import TranscriptSegment
-from .base import TranslationBackend
+from .base import ProgressCallback, TranslationBackend, report_progress
 
 
 def split_text_for_translation(text: str) -> list[str]:
@@ -90,12 +90,31 @@ class GoogleTranslationBackend(TranslationBackend):
         *,
         batch_size: int,
         glossary: dict[str, str],
+        progress_callback: ProgressCallback | None = None,
     ) -> list[TranscriptSegment]:
         translator = GoogleTranslator(source="en", target="ko")
         translated: list[TranscriptSegment] = []
+        total_segments = len(segments)
+        effective_batch_size = max(1, batch_size)
+        total_batches = max(1, (total_segments + effective_batch_size - 1) // effective_batch_size)
 
-        for offset in range(0, len(segments), batch_size):
-            batch = segments[offset : offset + batch_size]
+        if not segments:
+            report_progress(
+                progress_callback,
+                stage="translating",
+                progress=100.0,
+                detail="No subtitle groups were queued for translation.",
+            )
+            return translated
+
+        for batch_index, offset in enumerate(range(0, len(segments), effective_batch_size), start=1):
+            batch = segments[offset : offset + effective_batch_size]
+            report_progress(
+                progress_callback,
+                stage="translating",
+                progress=((batch_index - 1) / total_batches) * 100.0,
+                detail=f"Google quick draft translation batch {batch_index}/{total_batches}",
+            )
             prepared_texts = []
             replacements_per_text = []
             for segment in batch:
@@ -116,8 +135,14 @@ class GoogleTranslationBackend(TranslationBackend):
                     )
                 )
             print(
-                f"Translated {min(offset + batch_size, len(segments))}/{len(segments)} groups with google draft mode",
+                f"Translated {min(offset + effective_batch_size, total_segments)}/{total_segments} groups with google draft mode",
                 flush=True,
+            )
+            report_progress(
+                progress_callback,
+                stage="translating",
+                progress=(batch_index / total_batches) * 100.0,
+                detail=f"Translated {min(offset + effective_batch_size, total_segments)}/{total_segments} groups with google draft mode",
             )
             time.sleep(0.4)
         return translated

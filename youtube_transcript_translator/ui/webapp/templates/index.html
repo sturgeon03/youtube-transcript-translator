@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>YouTube Transcript Translator</title>
+    <link rel="stylesheet" href="/static/app.css" />
+  </head>
+  <body>
+    <main class="layout">
+      <section class="panel hero">
+        <div class="eyebrow">Local Lecture Pipeline</div>
+        <h1>YouTube 강의 URL로 자막 생성과 번역을 실행합니다</h1>
+        <p class="lede">
+          유튜브 영어 자막 또는 로컬 전사로 영어 원문을 만들고, glossary-aware 로컬 번역과
+          리뷰 산출물까지 한 번에 생성합니다.
+        </p>
+      </section>
+
+      <section class="panel form-panel">
+        <form id="job-form">
+          <label class="field">
+            <span>YouTube URL</span>
+            <input id="url" name="url" type="url" placeholder="https://www.youtube.com/watch?v=..." required />
+          </label>
+
+          <div class="grid two">
+            <label class="field">
+              <span>Transcript source</span>
+              <select id="transcript_source" name="transcript_source">
+                <option value="auto" {% if default_transcript_source == "auto" %}selected{% endif %}>auto</option>
+                <option value="youtube">youtube only</option>
+                <option value="transcribe">force local ASR</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span>Translator</span>
+              <select id="translator" name="translator">
+                <option value="local_mt" {% if default_translator == "local_mt" %}selected{% endif %}>local_mt (recommended)</option>
+                <option value="google">google (quick draft)</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="grid two">
+            <label class="field">
+              <span>Glossary profile</span>
+              <select id="glossary_profile" name="glossary_profile">
+                <option value="">none</option>
+                {% for profile in glossary_profiles %}
+                <option value="{{ profile.name }}">{{ profile.name }} - {{ profile.label }}</option>
+                {% endfor %}
+              </select>
+            </label>
+
+            <label class="field">
+              <span>Local translation model</span>
+              <input
+                id="local_translation_model"
+                name="local_translation_model"
+                type="text"
+                value="{{ default_local_model }}"
+              />
+            </label>
+          </div>
+
+          <details class="advanced">
+            <summary>Advanced options</summary>
+            <div class="grid two">
+              <label class="field">
+                <span>Local transcription model</span>
+                <input id="local_transcription_model" name="local_transcription_model" type="text" value="small.en" />
+              </label>
+              <label class="field">
+                <span>Wrap width</span>
+                <input id="wrap_width" name="wrap_width" type="number" min="16" max="48" value="24" />
+              </label>
+            </div>
+            <div class="grid two">
+              <label class="field checkbox">
+                <input id="register_overlay" name="register_overlay" type="checkbox" checked />
+                <span>Chrome overlay 등록</span>
+              </label>
+              <label class="field">
+                <span>Overlay label</span>
+                <input id="overlay_label" name="overlay_label" type="text" placeholder="Optional title" />
+              </label>
+            </div>
+          </details>
+
+          <div class="actions">
+            <button type="submit" id="submit-button">실행</button>
+            <span id="form-status" class="hint"></span>
+          </div>
+        </form>
+      </section>
+
+      <section class="panel status-panel">
+        <div class="status-header">
+          <h2>작업 상태</h2>
+          <span id="job-badge" class="badge idle">idle</span>
+        </div>
+        <div id="job-meta" class="meta"></div>
+
+        <div class="progress-panel">
+          <div class="progress-header">
+            <div>
+              <div id="progress-phase" class="progress-phase">대기 중</div>
+              <div id="progress-detail" class="progress-detail">아직 실행 중인 작업이 없습니다.</div>
+            </div>
+            <div id="progress-percent" class="progress-percent">0.0%</div>
+          </div>
+          <div class="progress-track" aria-hidden="true">
+            <div id="progress-fill" class="progress-fill"></div>
+          </div>
+          <pre id="terminal-progress" class="terminal-progress">[------------------------------]   0.0% | waiting | idle</pre>
+        </div>
+
+        <div id="result-links" class="result-links"></div>
+        <pre id="logs" class="logs">아직 실행 중인 작업이 없습니다.</pre>
+      </section>
+    </main>
+
+    <script>
+      window.APP_BOOTSTRAP = {
+        defaultExtensionRoot: {{ default_extension_root | tojson }}
+      };
+    </script>
+    <script src="/static/app.js"></script>
+  </body>
+</html>

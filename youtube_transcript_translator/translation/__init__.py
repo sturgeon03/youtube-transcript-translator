@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from ..app.config import TranslationConfig
 from ..transcript.models import TranscriptSegment
-from .base import TranslationBackend
+from .base import ProgressCallback, TranslationBackend
 from .google_backend import GoogleTranslationBackend
 from .local_mt_backend import LocalMTTranslationBackend
 
@@ -28,10 +28,12 @@ def translate_segments(
     *,
     config: TranslationConfig,
     glossary: dict[str, str],
+    progress_callback: ProgressCallback | None = None,
 ) -> list[TranscriptSegment]:
     backend = get_translation_backend(config)
     return backend.translate_segments(
         segments,
         batch_size=config.batch_size,
         glossary=glossary,
+        progress_callback=progress_callback,
     )

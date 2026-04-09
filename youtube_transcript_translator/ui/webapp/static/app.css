@@ -1,0 +1,291 @@
+:root {
+  --bg: #f5f1e8;
+  --panel: rgba(255, 252, 244, 0.9);
+  --border: rgba(40, 33, 21, 0.15);
+  --text: #1f1a14;
+  --muted: #6c6255;
+  --accent: #214f3c;
+  --accent-strong: #16372a;
+  --danger: #8a2d2d;
+  --shadow: 0 18px 45px rgba(31, 26, 20, 0.08);
+  --terminal-bg: #161714;
+  --terminal-fg: #e7f0ea;
+  --terminal-border: rgba(231, 240, 234, 0.08);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Segoe UI", "Noto Sans KR", sans-serif;
+  color: var(--text);
+  background:
+    radial-gradient(circle at top left, rgba(33, 79, 60, 0.12), transparent 32%),
+    linear-gradient(180deg, #fcfaf4 0%, var(--bg) 100%);
+}
+
+.layout {
+  width: min(1120px, calc(100vw - 32px));
+  margin: 32px auto 48px;
+  display: grid;
+  gap: 20px;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  box-shadow: var(--shadow);
+  padding: 24px;
+  backdrop-filter: blur(8px);
+}
+
+.hero h1,
+.status-panel h2 {
+  margin: 0 0 12px;
+}
+
+.eyebrow {
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 10px;
+}
+
+.lede,
+.hint,
+.meta,
+.field span,
+summary,
+.progress-detail {
+  color: var(--muted);
+}
+
+.grid.two {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.field input,
+.field select {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.85);
+  color: var(--text);
+  font-size: 15px;
+}
+
+.field.checkbox {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  padding-top: 32px;
+}
+
+.advanced {
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+  margin-top: 8px;
+}
+
+.advanced summary {
+  cursor: pointer;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+button {
+  border: 0;
+  border-radius: 999px;
+  padding: 13px 20px;
+  background: var(--accent);
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.status-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.badge {
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.badge.idle {
+  background: rgba(108, 98, 85, 0.14);
+  color: var(--muted);
+}
+
+.badge.queued {
+  background: rgba(124, 102, 59, 0.12);
+  color: #7c663b;
+}
+
+.badge.running {
+  background: rgba(33, 79, 60, 0.14);
+  color: var(--accent);
+}
+
+.badge.completed {
+  background: rgba(16, 115, 74, 0.14);
+  color: #10734a;
+}
+
+.badge.failed {
+  background: rgba(138, 45, 45, 0.14);
+  color: var(--danger);
+}
+
+.meta {
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+
+.progress-panel {
+  margin-bottom: 16px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.progress-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.progress-phase {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.progress-percent {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--accent-strong);
+}
+
+.progress-track {
+  position: relative;
+  width: 100%;
+  height: 14px;
+  border-radius: 999px;
+  background: rgba(33, 79, 60, 0.08);
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.progress-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #214f3c 0%, #2f7a5c 100%);
+  transition: width 0.35s ease;
+}
+
+.terminal-progress,
+.logs {
+  margin: 0;
+  border-radius: 16px;
+  border: 1px solid var(--terminal-border);
+  background: var(--terminal-bg);
+  color: var(--terminal-fg);
+  padding: 16px;
+  font-family: "Cascadia Code", "Consolas", monospace;
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.terminal-progress {
+  overflow-x: auto;
+  margin-bottom: 14px;
+}
+
+.result-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.result-links a {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 10px 14px;
+  background: rgba(33, 79, 60, 0.08);
+  color: var(--accent-strong);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.logs {
+  min-height: 320px;
+  max-height: 480px;
+  overflow: auto;
+}
+
+@media (max-width: 780px) {
+  .layout {
+    width: min(100vw - 20px, 1120px);
+    margin: 18px auto 28px;
+  }
+
+  .panel {
+    padding: 18px;
+    border-radius: 16px;
+  }
+
+  .grid.two {
+    grid-template-columns: 1fr;
+  }
+
+  .field.checkbox {
+    padding-top: 0;
+  }
+
+  .progress-header {
+    flex-direction: column;
+  }
+
+  .progress-percent {
+    font-size: 18px;
+  }
+}

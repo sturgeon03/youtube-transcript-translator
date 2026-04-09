@@ -78,6 +78,25 @@ Recommended translation model:
 
 The first `local_mt` run downloads the selected open-source model files once and then reuses the local cache.
 
+## Local web UI
+
+For a URL-first workflow, run the local web UI:
+
+```powershell
+python .\run_ui.py
+```
+
+Then open [http://127.0.0.1:8000](http://127.0.0.1:8000) if the browser does not open automatically.
+
+The UI currently supports:
+
+- YouTube URL input
+- transcript-source selection
+- `local_mt` vs `google` translator selection
+- glossary profile selection
+- optional Chrome overlay registration
+- job logs and result artifact links
+
 ## Basic usage
 
 Recommended local-only workflow:

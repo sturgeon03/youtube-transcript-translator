@@ -22,7 +22,7 @@ class TranslationPipelineTests(unittest.TestCase):
             output_path = temp_dir / "sample.ko.grouped.srt"
             review_path = temp_dir / "sample.review.md"
 
-            def fake_translate(segments, *, config, glossary):
+            def fake_translate(segments, *, config, glossary, progress_callback=None):
                 return [
                     TranscriptSegment(
                         index=1,

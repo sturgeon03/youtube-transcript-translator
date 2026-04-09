@@ -15,6 +15,7 @@ from ..sources.youtube import extract_video_id
 from ..transcript.models import TranscriptSegment
 from ..transcript.providers import resolve_transcript_from_url, write_english_outputs
 from ..translation import translate_segments
+from ..translation.base import ProgressCallback, report_progress
 from .config import PipelineConfig
 
 
@@ -65,15 +66,38 @@ def report_quality_issues(issues: list[QualityIssue]) -> None:
     print(f"Quality warnings: {len(issues)} ({summary})", flush=True)
 
 
-def run_pipeline(config: PipelineConfig, *, target_dir: Path | None = None) -> PipelineResult:
+def run_pipeline(
+    config: PipelineConfig,
+    *,
+    target_dir: Path | None = None,
+    progress_callback: ProgressCallback | None = None,
+) -> PipelineResult:
     target_dir = target_dir or Path.cwd()
+    report_progress(
+        progress_callback,
+        stage="loading_glossary",
+        progress=3.0,
+        detail="Loading glossary rules",
+    )
     glossary = load_glossary(
         config.translation.glossary_path,
         glossary_profile=config.translation.glossary_profile,
         registry_path=config.translation.glossary_registry_path,
     )
+    report_progress(
+        progress_callback,
+        stage="loading_glossary",
+        progress=6.0,
+        detail=f"Loaded {len(glossary)} glossary entries",
+    )
 
     if config.input_path is not None:
+        report_progress(
+            progress_callback,
+            stage="loading_input",
+            progress=12.0,
+            detail="Loading local English subtitle input",
+        )
         input_reference = config.input_path.resolve()
         english_segments = load_subtitles(input_reference)
         if config.output.english_text_output is not None:
@@ -89,6 +113,12 @@ def run_pipeline(config: PipelineConfig, *, target_dir: Path | None = None) -> P
                 text_path=None,
             )
     elif config.url:
+        report_progress(
+            progress_callback,
+            stage="resolving_transcript",
+            progress=12.0,
+            detail="Resolving English transcript from YouTube",
+        )
         english_segments, input_reference = resolve_transcript_from_url(
             config.url,
             target_dir=target_dir,
@@ -103,17 +133,59 @@ def run_pipeline(config: PipelineConfig, *, target_dir: Path | None = None) -> P
     else:
         raise ValueError("No input subtitle source was resolved.")
 
+    report_progress(
+        progress_callback,
+        stage="english_ready",
+        progress=28.0,
+        detail=f"Resolved {len(english_segments)} English subtitle segments",
+    )
     output_path = config.output.output_path.resolve() if config.output.output_path else default_output_path(input_reference)
+    report_progress(
+        progress_callback,
+        stage="grouping_subtitles",
+        progress=32.0,
+        detail="Grouping English transcript into translation units",
+    )
     grouped_segments = regroup_subtitles(
         english_segments,
         max_group_seconds=config.max_group_seconds,
         max_group_words=config.max_group_words,
         max_gap_seconds=config.max_gap_seconds,
     )
+    report_progress(
+        progress_callback,
+        stage="grouping_subtitles",
+        progress=38.0,
+        detail=f"Prepared {len(grouped_segments)} translation groups",
+    )
+
+    def translation_progress(
+        *,
+        stage: str,
+        progress: float | None = None,
+        detail: str | None = None,
+    ) -> None:
+        mapped_progress = 38.0
+        if progress is not None:
+            mapped_progress = 38.0 + max(0.0, min(100.0, progress)) * 0.48
+        report_progress(
+            progress_callback,
+            stage=stage,
+            progress=mapped_progress,
+            detail=detail,
+        )
+
     translated_groups = translate_segments(
         grouped_segments,
         config=config.translation,
         glossary=glossary,
+        progress_callback=translation_progress,
+    )
+    report_progress(
+        progress_callback,
+        stage="quality_checks",
+        progress=88.0,
+        detail="Running translation quality checks",
     )
     quality_issues = collect_translation_quality_issues(
         grouped_segments,
@@ -123,6 +195,12 @@ def run_pipeline(config: PipelineConfig, *, target_dir: Path | None = None) -> P
     )
     report_quality_issues(quality_issues)
 
+    report_progress(
+        progress_callback,
+        stage="rendering_subtitles",
+        progress=93.0,
+        detail="Formatting display-friendly Korean subtitles",
+    )
     display_segments = build_display_segments(
         translated_groups,
         wrap_width=config.translation.wrap_width,
@@ -130,6 +208,12 @@ def run_pipeline(config: PipelineConfig, *, target_dir: Path | None = None) -> P
     write_srt(output_path, display_segments)
 
     if config.output.review_output is not None:
+        report_progress(
+            progress_callback,
+            stage="writing_artifacts",
+            progress=95.0,
+            detail="Writing bilingual review output",
+        )
         write_bilingual_review_markdown(
             config.output.review_output.resolve(),
             grouped_segments,
@@ -137,10 +221,22 @@ def run_pipeline(config: PipelineConfig, *, target_dir: Path | None = None) -> P
             quality_issues=quality_issues,
         )
     if config.output.json_output is not None:
+        report_progress(
+            progress_callback,
+            stage="writing_artifacts",
+            progress=97.0,
+            detail="Writing machine-readable segment artifact",
+        )
         write_segments_json(config.output.json_output.resolve(), translated_groups)
 
     registered_overlay_path: Path | None = None
     if config.output.extension_root is not None:
+        report_progress(
+            progress_callback,
+            stage="registering_overlay",
+            progress=99.0,
+            detail="Registering generated subtitles with the Chrome overlay",
+        )
         registration_video_id = config.output.video_id or (extract_video_id(config.url) if config.url else None)
         if not registration_video_id:
             raise ValueError("--extension-root requires --video-id when the input is not a YouTube URL.")
@@ -150,6 +246,13 @@ def run_pipeline(config: PipelineConfig, *, target_dir: Path | None = None) -> P
             output_path,
             label=config.output.overlay_label,
         )
+
+    report_progress(
+        progress_callback,
+        stage="completed",
+        progress=100.0,
+        detail="Pipeline completed",
+    )
 
     return PipelineResult(
         input_reference=input_reference,
