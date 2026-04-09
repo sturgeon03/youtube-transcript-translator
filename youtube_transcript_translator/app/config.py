@@ -46,6 +46,8 @@ class TranslationConfig:
     batch_size: int
     wrap_width: int
     glossary_path: Path | None
+    glossary_profile: str | None
+    glossary_registry_path: Path | None
     openai_model: str
     openai_reasoning_effort: str
     openai_api_key_env: str

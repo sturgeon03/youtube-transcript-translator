@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from ..glossary.loader import list_glossary_profiles
 from .config import (
     DEFAULT_BATCH_SIZE,
     DEFAULT_LOCAL_TRANSCRIPTION_COMPUTE_TYPE,
@@ -78,7 +79,21 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--english-output", type=Path)
     parser.add_argument("--english-text-output", type=Path)
     parser.add_argument("--translator", choices=("google", "openai"), default=DEFAULT_TRANSLATOR)
-    parser.add_argument("--glossary", type=Path)
+    parser.add_argument("--glossary", type=Path, help="Direct glossary file path.")
+    parser.add_argument(
+        "--glossary-profile",
+        help="Named glossary profile from glossaries/registry.json, for example 'underactuated'.",
+    )
+    parser.add_argument(
+        "--glossary-registry",
+        type=Path,
+        help="Optional custom glossary registry JSON path.",
+    )
+    parser.add_argument(
+        "--list-glossary-profiles",
+        action="store_true",
+        help="List available glossary profiles and exit.",
+    )
     parser.add_argument("--openai-model", default=DEFAULT_OPENAI_MODEL)
     parser.add_argument(
         "--openai-reasoning-effort",
@@ -91,7 +106,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--video-id")
     parser.add_argument("--overlay-label")
     args = parser.parse_args()
-    if not args.url and not args.input_path:
+    if args.glossary and args.glossary_profile:
+        parser.error("Use either --glossary or --glossary-profile, not both.")
+    if not args.list_glossary_profiles and not args.url and not args.input_path:
         parser.error("Provide either --url or --input.")
     return args
 
@@ -120,6 +137,8 @@ def build_config(args: argparse.Namespace) -> PipelineConfig:
             batch_size=args.batch_size,
             wrap_width=args.wrap_width,
             glossary_path=args.glossary,
+            glossary_profile=args.glossary_profile,
+            glossary_registry_path=args.glossary_registry,
             openai_model=args.openai_model,
             openai_reasoning_effort=args.openai_reasoning_effort,
             openai_api_key_env=args.openai_api_key_env,
@@ -138,8 +157,25 @@ def build_config(args: argparse.Namespace) -> PipelineConfig:
     )
 
 
+def print_glossary_profiles(registry_path: Path | None) -> None:
+    profiles = list_glossary_profiles(registry_path)
+    if not profiles:
+        print("No glossary profiles found.")
+        return
+
+    for profile in profiles:
+        print(f"{profile.name}: {profile.label}")
+        print(f"  file: {profile.path}")
+        if profile.description:
+            print(f"  description: {profile.description}")
+
+
 def main() -> None:
     args = parse_args()
+    if args.list_glossary_profiles:
+        print_glossary_profiles(args.glossary_registry)
+        return
+
     config = build_config(args)
     result = run_pipeline(config)
 
@@ -147,6 +183,10 @@ def main() -> None:
     print(f"English segments: {result.english_segments_count}")
     print(f"Grouped entries: {result.grouped_segments_count}")
     print(f"Translator: {config.translation.backend}")
+    if config.translation.glossary_profile:
+        print(f"Glossary profile: {config.translation.glossary_profile}")
+    elif config.translation.glossary_path is not None:
+        print(f"Glossary file: {config.translation.glossary_path.resolve()}")
     if config.url:
         print(f"Transcript source: {config.transcript.source_mode}")
     print(f"Korean output: {result.korean_output_path}")

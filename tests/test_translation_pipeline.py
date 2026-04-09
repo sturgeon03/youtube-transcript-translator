@@ -28,7 +28,7 @@ class TranslationPipelineTests(unittest.TestCase):
                         index=1,
                         start=segments[0].start,
                         end=segments[0].end,
-                        text="안녕하세요 로봇공학 수업입니다.",
+                        text="translated robotics class",
                         source="test",
                     )
                 ]
@@ -58,6 +58,8 @@ class TranslationPipelineTests(unittest.TestCase):
                             batch_size=40,
                             wrap_width=24,
                             glossary_path=None,
+                            glossary_profile=None,
+                            glossary_registry_path=None,
                             openai_model="gpt-5.4-mini",
                             openai_reasoning_effort="low",
                             openai_api_key_env="OPENAI_API_KEY",
@@ -78,7 +80,8 @@ class TranslationPipelineTests(unittest.TestCase):
 
             self.assertTrue(result.korean_output_path.exists())
             self.assertTrue(review_path.exists())
-            self.assertIn("안녕하세요 로봇공학 수업입니다.", output_path.read_text(encoding="utf-8-sig"))
+            self.assertIn("translated robotics class", output_path.read_text(encoding="utf-8-sig"))
+            self.assertIn("Hello robotics class.", review_path.read_text(encoding="utf-8-sig"))
 
 
 if __name__ == "__main__":

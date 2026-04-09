@@ -1,0 +1,122 @@
+﻿# MIT Underactuated Robotics core glossary
+# Source basis: underactuated.csail.mit.edu index plus major chapter pages.
+# Format: source => target
+
+# Course framing
+underactuated robotics => 언더액추에이티드 로보틱스
+underactuated system => 언더액추에이티드 시스템
+underactuated systems => 언더액추에이티드 시스템
+underactuated robot => 언더액추에이티드 로봇
+underactuated robots => 언더액추에이티드 로봇
+nonlinear dynamics => 비선형 동역학
+nonlinear system => 비선형 시스템
+equation of motion => 운동방정식
+equations of motion => 운동방정식
+manipulator equation => 매니퓰레이터 방정식
+state space => 상태공간
+state trajectory => 상태 궤적
+state feedback => 상태 피드백
+feedback stabilization => 피드백 안정화
+
+# Stability and Lyapunov analysis
+fixed point => 고정점
+phase portrait => 위상 초상
+region of attraction => 수렴 영역
+basin of attraction => 인력 영역
+Lyapunov function => 리아푸노프 함수
+Lyapunov analysis => 리아푸노프 해석
+Lyapunov stability => 리아푸노프 안정성
+control Lyapunov function => 제어 리아푸노프 함수
+control barrier function => 제어 배리어 함수
+barrier function => 배리어 함수
+
+# Feedback linearization and swing-up
+partial feedback linearization => 부분 피드백 선형화
+collocated partial feedback linearization => collocated 부분 피드백 선형화
+non collocated partial feedback linearization => non-collocated 부분 피드백 선형화
+swing-up control => 스윙업 제어
+energy shaping => 에너지 형상화
+input saturation => 입력 포화
+
+# Hybrid and limit-cycle behavior
+hybrid dynamical system => 하이브리드 동역학 시스템
+hybrid zero dynamics => 하이브리드 영동역학
+limit cycle => 극한 주기
+limit cycles => 극한 주기
+orbital stability => 궤도 안정성
+Poincare map => 푸앵카레 사상
+rimless wheel => 림리스 휠
+compass gait => 컴퍼스 게이트
+passive dynamic walking => 수동 동적 보행
+
+# Legged locomotion and whole-body dynamics
+Spring Loaded Inverted Pendulum => 스프링 로드 역진자
+SLIP model => SLIP 모델
+zero moment point => 영모멘트점
+ZMP => ZMP
+center of pressure => 압력중심
+CoP => CoP
+centroidal dynamics => 센트로이달 동역학
+centroidal momentum => 센트로이달 운동량
+contact wrench cone => 접촉 렌치 원뿔
+friction cone => 마찰 원뿔
+contact force => 접촉력
+contact mode => 접촉 모드
+foot placement => 발 디딤 위치
+
+# Dynamic programming and optimal control
+dynamic programming => 동적 계획법
+approximate dynamic programming => 근사 동적 계획법
+value function => 가치 함수
+Bellman equation => 벨만 방정식
+Hamilton Jacobi Bellman equation => 해밀턴-야코비-벨만 방정식
+Hamilton-Jacobi-Bellman equation => 해밀턴-야코비-벨만 방정식
+HJB equation => HJB 방정식
+policy iteration => 정책 반복
+value iteration => 가치 반복
+fitted value iteration => 적합 가치 반복
+finite horizon => 유한 시간 지평선
+infinite horizon => 무한 시간 지평선
+
+# LQR and Riccati equations
+linear quadratic regulator => 선형 이차 레귤레이터
+Linear Quadratic Regulator => 선형 이차 레귤레이터
+LQR => LQR
+time varying LQR => 시변 LQR
+time-varying LQR => 시변 LQR
+iterative LQR => 반복 LQR
+algebraic Riccati equation => 대수 리카티 방정식
+differential Riccati equation => 미분 리카티 방정식
+
+# Optimization and planning
+trajectory optimization => 궤적 최적화
+direct collocation => 직접 콜로케이션
+direct shooting => 직접 슈팅
+sequential convex programming => 순차 볼록 프로그래밍
+differential dynamic programming => 미분 동적 계획법
+motion planning => 모션 플래닝
+feedback motion planning => 피드백 모션 플래닝
+configuration space => 형상공간
+collision free => 충돌 없는
+probabilistic roadmap => 확률적 로드맵
+PRM => PRM
+rapidly exploring random tree => 급속 탐색 무작위 트리
+RRT => RRT
+funnel => 퍼널
+
+# Robust, stochastic, and learning-oriented control
+sums of squares => 제곱합
+SOS => SOS
+semidefinite programming => 준정정부호 계획법
+semidefinite program => 준정정부호 계획
+robust control => 강인 제어
+stochastic control => 확률 제어
+model predictive control => 모델 예측 제어
+MPC => MPC
+chance constraint => 확률 제약
+policy search => 정책 탐색
+policy gradient => 정책 그래디언트
+actor critic => 액터-크리틱
+reinforcement learning => 강화학습
+Markov decision process => 마르코프 결정 과정
+MDP => MDP

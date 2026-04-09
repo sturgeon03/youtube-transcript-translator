@@ -1,0 +1,23 @@
+{
+  "profiles": {
+    "underactuated": {
+      "file": "underactuated_core.txt",
+      "label": "MIT Underactuated Robotics core glossary",
+      "description": "Recurring translation rules curated from the Underactuated Robotics notes for long lecture subtitle work.",
+      "source_urls": [
+        "https://underactuated.csail.mit.edu/index.html",
+        "https://underactuated.csail.mit.edu/acrobot.html",
+        "https://underactuated.csail.mit.edu/limit_cycles.html",
+        "https://underactuated.csail.mit.edu/humanoids.html",
+        "https://underactuated.csail.mit.edu/dp.html",
+        "https://underactuated.csail.mit.edu/lqr.html",
+        "https://underactuated.csail.mit.edu/lyapunov.html",
+        "https://underactuated.csail.mit.edu/trajopt.html",
+        "https://underactuated.csail.mit.edu/planning.html",
+        "https://underactuated.csail.mit.edu/robust.html",
+        "https://underactuated.csail.mit.edu/stochastic.html",
+        "https://underactuated.csail.mit.edu/policy_search.html"
+      ]
+    }
+  }
+}

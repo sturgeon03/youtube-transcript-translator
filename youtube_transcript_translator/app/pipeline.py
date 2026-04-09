@@ -34,7 +34,11 @@ def default_output_path(input_reference: Path) -> Path:
 
 def run_pipeline(config: PipelineConfig, *, target_dir: Path | None = None) -> PipelineResult:
     target_dir = target_dir or Path.cwd()
-    glossary = load_glossary(config.translation.glossary_path)
+    glossary = load_glossary(
+        config.translation.glossary_path,
+        glossary_profile=config.translation.glossary_profile,
+        registry_path=config.translation.glossary_registry_path,
+    )
 
     if config.input_path is not None:
         input_reference = config.input_path.resolve()

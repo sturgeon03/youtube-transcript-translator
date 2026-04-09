@@ -17,6 +17,7 @@ Generate English transcripts from YouTube videos, translate them into Korean sub
 - `youtube_transcript_translator/`: main Python package
 - `overlay_registry.py`: thin CLI entrypoint for extension registration
 - `artifacts/`: local generated transcripts and subtitles
+- `glossaries/`: reusable glossary profiles and registry metadata
 - `robotics_glossary.example.txt`: example glossary for technical terms
 - `youtube_transcript_translator/ui/chrome_overlay/`: Chrome extension that overlays packaged Korean subtitles on YouTube
 
@@ -37,6 +38,7 @@ The repository is structured as a non-realtime batch pipeline:
 ## Target folder layout
 
 ```text
+glossaries/
 youtube_transcript_translator/
   app/
   sources/
@@ -66,39 +68,26 @@ python .\translate_youtube_subtitles.py `
   --transcript-source auto `
   --transcription-backend local `
   --translator google `
+  --glossary-profile underactuated `
   --english-output ".\artifacts\VIDEO_ID.en.srt" `
   --english-text-output ".\artifacts\VIDEO_ID.en.txt" `
   --output ".\artifacts\VIDEO_ID.ko.grouped.srt"
 ```
 
-Use OpenAI translation with a glossary:
+List the built-in glossary profiles:
 
 ```powershell
-$env:OPENAI_API_KEY="YOUR_KEY_HERE"
+python .\translate_youtube_subtitles.py --list-glossary-profiles
+```
 
+Use a direct glossary file instead of a named profile:
+
+```powershell
 python .\translate_youtube_subtitles.py `
   --url "https://www.youtube.com/watch?v=VIDEO_ID" `
   --transcript-source auto `
-  --translator openai `
-  --openai-model gpt-5.4-mini `
+  --translator google `
   --glossary ".\robotics_glossary.example.txt" `
-  --output ".\artifacts\VIDEO_ID.ko.grouped.srt"
-```
-
-Force OpenAI speech-to-text when YouTube subtitles are unavailable:
-
-```powershell
-$env:OPENAI_API_KEY="YOUR_KEY_HERE"
-
-python .\translate_youtube_subtitles.py `
-  --url "https://www.youtube.com/watch?v=VIDEO_ID" `
-  --transcript-source transcribe `
-  --transcription-backend openai `
-  --transcription-model gpt-4o-transcribe-diarize `
-  --translator openai `
-  --openai-model gpt-5.4-mini `
-  --english-output ".\artifacts\VIDEO_ID.en.transcribed.srt" `
-  --english-text-output ".\artifacts\VIDEO_ID.en.transcribed.txt" `
   --output ".\artifacts\VIDEO_ID.ko.grouped.srt"
 ```
 
@@ -110,10 +99,45 @@ python .\translate_youtube_subtitles.py `
   --transcript-source auto `
   --transcription-backend local `
   --translator google `
+  --glossary-profile underactuated `
   --extension-root ".\youtube_transcript_translator\ui\chrome_overlay" `
   --overlay-label "Optional title" `
   --output ".\artifacts\VIDEO_ID.ko.grouped.srt"
 ```
+
+## Glossary profiles
+
+The glossary subsystem supports two selection modes:
+
+- `--glossary-profile NAME`: pick a named profile from `glossaries/registry.json`
+- `--glossary PATH`: use a direct glossary file
+
+Only one real profile is included right now:
+
+- `underactuated`: a core terminology set for the MIT Underactuated Robotics notes
+
+The Underactuated glossary was curated from the main course index and the note pages that repeatedly cover underactuated systems, feedback linearization, limit cycles, legged locomotion, dynamic programming, LQR, Lyapunov analysis, trajectory optimization, motion planning, robust and stochastic control, and policy search.
+
+Primary source pages:
+
+- [Underactuated Robotics index](https://underactuated.csail.mit.edu/index.html)
+- [Acrobot and feedback linearization notes](https://underactuated.csail.mit.edu/acrobot.html)
+- [Limit cycles notes](https://underactuated.csail.mit.edu/limit_cycles.html)
+- [Humanoids notes](https://underactuated.csail.mit.edu/humanoids.html)
+- [Dynamic programming notes](https://underactuated.csail.mit.edu/dp.html)
+- [LQR notes](https://underactuated.csail.mit.edu/lqr.html)
+- [Lyapunov notes](https://underactuated.csail.mit.edu/lyapunov.html)
+- [Trajectory optimization notes](https://underactuated.csail.mit.edu/trajopt.html)
+- [Motion planning notes](https://underactuated.csail.mit.edu/planning.html)
+- [Robust control notes](https://underactuated.csail.mit.edu/robust.html)
+- [Stochastic control notes](https://underactuated.csail.mit.edu/stochastic.html)
+- [Policy search notes](https://underactuated.csail.mit.edu/policy_search.html)
+
+To add a future glossary:
+
+1. Add a new `.txt` or `.json` glossary file under `glossaries/`.
+2. Add a new profile entry in `glossaries/registry.json`.
+3. Run the CLI with `--glossary-profile YOUR_PROFILE_NAME`.
 
 ## Chrome extension
 
