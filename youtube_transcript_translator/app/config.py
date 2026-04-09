@@ -8,36 +8,29 @@ DEFAULT_MAX_GROUP_SECONDS = 7.0
 DEFAULT_MAX_GROUP_WORDS = 18
 DEFAULT_MAX_GAP_SECONDS = 0.75
 DEFAULT_WRAP_WIDTH = 24
-DEFAULT_BATCH_SIZE = 40
-DEFAULT_TRANSLATOR = "google"
-DEFAULT_OPENAI_MODEL = "gpt-5.4-mini"
-DEFAULT_OPENAI_REASONING_EFFORT = "low"
-DEFAULT_OPENAI_TIMEOUT_SECONDS = 120.0
-DEFAULT_OPENAI_MAX_BATCH_SIZE = 12
+DEFAULT_BATCH_SIZE = 8
+DEFAULT_TRANSLATOR = "local_mt"
 DEFAULT_TRANSCRIPT_SOURCE = "auto"
-DEFAULT_TRANSCRIPTION_BACKEND = "local"
-DEFAULT_TRANSCRIPTION_MODEL = "gpt-4o-transcribe-diarize"
 DEFAULT_TRANSCRIPTION_LANGUAGE = "en"
-DEFAULT_TRANSCRIPTION_TIMEOUT_SECONDS = 900.0
 DEFAULT_LOCAL_TRANSCRIPTION_MODEL = "small.en"
 DEFAULT_LOCAL_TRANSCRIPTION_DEVICE = "auto"
 DEFAULT_LOCAL_TRANSCRIPTION_COMPUTE_TYPE = "default"
-DEFAULT_TRANSCRIPTION_CHUNK_SECONDS = 600.0
-MAX_AUDIO_UPLOAD_BYTES = 25 * 1024 * 1024
+DEFAULT_LOCAL_TRANSLATION_MODEL = "facebook/nllb-200-distilled-600M"
+DEFAULT_LOCAL_TRANSLATION_DEVICE = "auto"
+DEFAULT_LOCAL_TRANSLATION_SOURCE_LANG = "eng_Latn"
+DEFAULT_LOCAL_TRANSLATION_TARGET_LANG = "kor_Hang"
+DEFAULT_LOCAL_TRANSLATION_MAX_INPUT_LENGTH = 512
+DEFAULT_LOCAL_TRANSLATION_MAX_NEW_TOKENS = 256
+DEFAULT_LOCAL_TRANSLATION_NUM_BEAMS = 4
 
 
 @dataclass
 class TranscriptConfig:
     source_mode: str
-    backend: str
-    openai_model: str
     language: str
     local_model: str
     local_device: str
     local_compute_type: str
-    timeout_seconds: float
-    chunk_seconds: float
-    openai_api_key_env: str
 
 
 @dataclass
@@ -48,10 +41,13 @@ class TranslationConfig:
     glossary_path: Path | None
     glossary_profile: str | None
     glossary_registry_path: Path | None
-    openai_model: str
-    openai_reasoning_effort: str
-    openai_api_key_env: str
-    openai_timeout_seconds: float
+    local_model: str
+    local_device: str
+    local_source_lang: str
+    local_target_lang: str
+    local_max_input_length: int
+    local_max_new_tokens: int
+    local_num_beams: int
 
 
 @dataclass

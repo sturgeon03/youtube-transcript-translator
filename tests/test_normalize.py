@@ -33,14 +33,13 @@ class NormalizeTests(unittest.TestCase):
         )
         built = build_display_friendly_subtitles(
             segment,
-            text="좋아요 여러분 오늘은 로봇 역학과 제어 그리고 최적화에 대해 간단하게 이야기해보겠습니다",
+            text=(
+                "Today we will briefly cover robot control, optimization, "
+                "and the main modeling assumptions behind the lecture."
+            ),
             wrap_width=24,
             start_index=1,
         )
 
         self.assertGreaterEqual(len(built), 1)
         self.assertTrue(all(len([line for line in item.text.splitlines() if line.strip()]) <= 2 for item in built))
-
-
-if __name__ == "__main__":
-    unittest.main()

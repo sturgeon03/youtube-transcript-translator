@@ -9,18 +9,18 @@ from .config import (
     DEFAULT_LOCAL_TRANSCRIPTION_COMPUTE_TYPE,
     DEFAULT_LOCAL_TRANSCRIPTION_DEVICE,
     DEFAULT_LOCAL_TRANSCRIPTION_MODEL,
+    DEFAULT_LOCAL_TRANSLATION_DEVICE,
+    DEFAULT_LOCAL_TRANSLATION_MAX_INPUT_LENGTH,
+    DEFAULT_LOCAL_TRANSLATION_MAX_NEW_TOKENS,
+    DEFAULT_LOCAL_TRANSLATION_MODEL,
+    DEFAULT_LOCAL_TRANSLATION_NUM_BEAMS,
+    DEFAULT_LOCAL_TRANSLATION_SOURCE_LANG,
+    DEFAULT_LOCAL_TRANSLATION_TARGET_LANG,
     DEFAULT_MAX_GAP_SECONDS,
     DEFAULT_MAX_GROUP_SECONDS,
     DEFAULT_MAX_GROUP_WORDS,
-    DEFAULT_OPENAI_MODEL,
-    DEFAULT_OPENAI_REASONING_EFFORT,
-    DEFAULT_OPENAI_TIMEOUT_SECONDS,
     DEFAULT_TRANSCRIPT_SOURCE,
-    DEFAULT_TRANSCRIPTION_BACKEND,
-    DEFAULT_TRANSCRIPTION_CHUNK_SECONDS,
     DEFAULT_TRANSCRIPTION_LANGUAGE,
-    DEFAULT_TRANSCRIPTION_MODEL,
-    DEFAULT_TRANSCRIPTION_TIMEOUT_SECONDS,
     DEFAULT_TRANSLATOR,
     DEFAULT_WRAP_WIDTH,
     OutputConfig,
@@ -34,9 +34,8 @@ from .pipeline import run_pipeline
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Download English auto subtitles from a YouTube video or load existing "
-            "subtitles/transcripts, regroup them into readable chunks, and translate "
-            "them into Korean."
+            "Generate English lecture transcripts from YouTube or local subtitle files, "
+            "translate them into Korean with local or free backends, and write subtitle artifacts."
         )
     )
     parser.add_argument("--url", help="YouTube video URL.")
@@ -60,25 +59,18 @@ def parse_args() -> argparse.Namespace:
         choices=("auto", "youtube", "transcribe"),
         default=DEFAULT_TRANSCRIPT_SOURCE,
     )
-    parser.add_argument(
-        "--transcription-backend",
-        choices=("local", "openai"),
-        default=DEFAULT_TRANSCRIPTION_BACKEND,
-    )
-    parser.add_argument(
-        "--transcription-model",
-        choices=("gpt-4o-transcribe-diarize", "whisper-1"),
-        default=DEFAULT_TRANSCRIPTION_MODEL,
-    )
     parser.add_argument("--transcription-language", default=DEFAULT_TRANSCRIPTION_LANGUAGE)
     parser.add_argument("--local-transcription-model", default=DEFAULT_LOCAL_TRANSCRIPTION_MODEL)
     parser.add_argument("--local-transcription-device", default=DEFAULT_LOCAL_TRANSCRIPTION_DEVICE)
     parser.add_argument("--local-transcription-compute-type", default=DEFAULT_LOCAL_TRANSCRIPTION_COMPUTE_TYPE)
-    parser.add_argument("--transcription-timeout-seconds", type=float, default=DEFAULT_TRANSCRIPTION_TIMEOUT_SECONDS)
-    parser.add_argument("--transcription-chunk-seconds", type=float, default=DEFAULT_TRANSCRIPTION_CHUNK_SECONDS)
     parser.add_argument("--english-output", type=Path)
     parser.add_argument("--english-text-output", type=Path)
-    parser.add_argument("--translator", choices=("google", "openai"), default=DEFAULT_TRANSLATOR)
+    parser.add_argument(
+        "--translator",
+        choices=("local_mt", "google"),
+        default=DEFAULT_TRANSLATOR,
+        help="Translation backend. 'local_mt' is the recommended quality path. 'google' is quick draft mode.",
+    )
     parser.add_argument("--glossary", type=Path, help="Direct glossary file path.")
     parser.add_argument(
         "--glossary-profile",
@@ -94,14 +86,17 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="List available glossary profiles and exit.",
     )
-    parser.add_argument("--openai-model", default=DEFAULT_OPENAI_MODEL)
     parser.add_argument(
-        "--openai-reasoning-effort",
-        choices=("none", "low", "medium", "high", "xhigh"),
-        default=DEFAULT_OPENAI_REASONING_EFFORT,
+        "--local-translation-model",
+        default=DEFAULT_LOCAL_TRANSLATION_MODEL,
+        help="Local seq2seq translation model identifier, such as facebook/nllb-200-distilled-600M.",
     )
-    parser.add_argument("--openai-api-key-env", default="OPENAI_API_KEY")
-    parser.add_argument("--openai-timeout-seconds", type=float, default=DEFAULT_OPENAI_TIMEOUT_SECONDS)
+    parser.add_argument("--local-translation-device", default=DEFAULT_LOCAL_TRANSLATION_DEVICE)
+    parser.add_argument("--local-translation-source-lang", default=DEFAULT_LOCAL_TRANSLATION_SOURCE_LANG)
+    parser.add_argument("--local-translation-target-lang", default=DEFAULT_LOCAL_TRANSLATION_TARGET_LANG)
+    parser.add_argument("--local-translation-max-input-length", type=int, default=DEFAULT_LOCAL_TRANSLATION_MAX_INPUT_LENGTH)
+    parser.add_argument("--local-translation-max-new-tokens", type=int, default=DEFAULT_LOCAL_TRANSLATION_MAX_NEW_TOKENS)
+    parser.add_argument("--local-translation-num-beams", type=int, default=DEFAULT_LOCAL_TRANSLATION_NUM_BEAMS)
     parser.add_argument("--extension-root", type=Path)
     parser.add_argument("--video-id")
     parser.add_argument("--overlay-label")
@@ -122,15 +117,10 @@ def build_config(args: argparse.Namespace) -> PipelineConfig:
         max_gap_seconds=args.max_gap_seconds,
         transcript=TranscriptConfig(
             source_mode=args.transcript_source,
-            backend=args.transcription_backend,
-            openai_model=args.transcription_model,
             language=args.transcription_language,
             local_model=args.local_transcription_model,
             local_device=args.local_transcription_device,
             local_compute_type=args.local_transcription_compute_type,
-            timeout_seconds=args.transcription_timeout_seconds,
-            chunk_seconds=args.transcription_chunk_seconds,
-            openai_api_key_env=args.openai_api_key_env,
         ),
         translation=TranslationConfig(
             backend=args.translator,
@@ -139,10 +129,13 @@ def build_config(args: argparse.Namespace) -> PipelineConfig:
             glossary_path=args.glossary,
             glossary_profile=args.glossary_profile,
             glossary_registry_path=args.glossary_registry,
-            openai_model=args.openai_model,
-            openai_reasoning_effort=args.openai_reasoning_effort,
-            openai_api_key_env=args.openai_api_key_env,
-            openai_timeout_seconds=args.openai_timeout_seconds,
+            local_model=args.local_translation_model,
+            local_device=args.local_translation_device,
+            local_source_lang=args.local_translation_source_lang,
+            local_target_lang=args.local_translation_target_lang,
+            local_max_input_length=args.local_translation_max_input_length,
+            local_max_new_tokens=args.local_translation_max_new_tokens,
+            local_num_beams=args.local_translation_num_beams,
         ),
         output=OutputConfig(
             output_path=args.output,
@@ -192,6 +185,8 @@ def main() -> None:
     print(f"Korean output: {result.korean_output_path}")
     if result.overlay_subtitle_path is not None:
         print(f"Overlay subtitle: {result.overlay_subtitle_path}")
+    if result.quality_issue_count:
+        print(f"Quality warnings: {result.quality_issue_count}")
 
 
 if __name__ == "__main__":

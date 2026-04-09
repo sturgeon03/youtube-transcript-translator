@@ -2,12 +2,25 @@
 
 Generate English transcripts from YouTube videos, translate them into Korean subtitles, and optionally load those subtitles into a Chrome extension overlay.
 
+## Product direction
+
+This repository is intentionally local-first and free-only.
+
+- English transcript acquisition: YouTube English subtitles when available
+- English transcript fallback: local `faster-whisper`
+- Recommended translation path: local seq2seq machine translation
+- Optional quick draft mode: Google translation
+- Output style: non-realtime batch subtitle generation for long technical lectures
+
+Paid API workflows are not part of the supported architecture.
+
 ## What it does
 
 - Pull English auto subtitles from YouTube when available
 - Fall back to local `faster-whisper` transcription when subtitles are missing
-- Optionally use OpenAI transcription, with chunked retries for long videos
-- Translate grouped subtitle chunks into Korean
+- Translate grouped subtitle chunks into Korean with a local glossary-aware backend
+- Preserve glossary terms, URLs, filenames, and equation-like tokens through translation
+- Run post-translation quality checks for glossary coverage, protected token restoration, and symbol preservation
 - Save English transcript files and Korean `.srt` output
 - Package generated Korean subtitles into the included Chrome extension automatically
 
@@ -30,7 +43,7 @@ The repository is structured as a non-realtime batch pipeline:
 3. `transcript/`: transcript segment models and transcript providers
 4. `normalize/`: cleanup, overlap handling, regrouping, and display-friendly splitting
 5. `glossary/`: glossary loading and placeholder/token protection
-6. `translation/`: replaceable translation backends and backend dispatch
+6. `translation/`: replaceable free/local translation backends
 7. `postprocess/`: restoration, consistency checks, and quality checks
 8. `render/`: SRT/TXT/review/JSON artifact generation
 9. `ui/`: downstream viewer layer only
@@ -58,19 +71,38 @@ tests/
 python -m pip install -r requirements.txt
 ```
 
+Recommended translation model:
+
+- default quality model: `facebook/nllb-200-distilled-600M`
+- lighter local alternative: `Helsinki-NLP/opus-mt-en-ko`
+
+The first `local_mt` run downloads the selected open-source model files once and then reuses the local cache.
+
 ## Basic usage
 
-Use YouTube auto subtitles when possible, then fall back to local transcription:
+Recommended local-only workflow:
 
 ```powershell
 python .\translate_youtube_subtitles.py `
   --url "https://www.youtube.com/watch?v=VIDEO_ID" `
   --transcript-source auto `
-  --transcription-backend local `
-  --translator google `
+  --translator local_mt `
+  --local-translation-model "facebook/nllb-200-distilled-600M" `
   --glossary-profile underactuated `
   --english-output ".\artifacts\VIDEO_ID.en.srt" `
   --english-text-output ".\artifacts\VIDEO_ID.en.txt" `
+  --review-output ".\artifacts\VIDEO_ID.review.md" `
+  --output ".\artifacts\VIDEO_ID.ko.grouped.srt"
+```
+
+Use Google only as a quick draft baseline:
+
+```powershell
+python .\translate_youtube_subtitles.py `
+  --url "https://www.youtube.com/watch?v=VIDEO_ID" `
+  --transcript-source auto `
+  --translator google `
+  --glossary-profile underactuated `
   --output ".\artifacts\VIDEO_ID.ko.grouped.srt"
 ```
 
@@ -86,7 +118,7 @@ Use a direct glossary file instead of a named profile:
 python .\translate_youtube_subtitles.py `
   --url "https://www.youtube.com/watch?v=VIDEO_ID" `
   --transcript-source auto `
-  --translator google `
+  --translator local_mt `
   --glossary ".\robotics_glossary.example.txt" `
   --output ".\artifacts\VIDEO_ID.ko.grouped.srt"
 ```
@@ -97,8 +129,7 @@ Register the generated Korean subtitle in the bundled extension automatically:
 python .\translate_youtube_subtitles.py `
   --url "https://www.youtube.com/watch?v=VIDEO_ID" `
   --transcript-source auto `
-  --transcription-backend local `
-  --translator google `
+  --translator local_mt `
   --glossary-profile underactuated `
   --extension-root ".\youtube_transcript_translator\ui\chrome_overlay" `
   --overlay-label "Optional title" `

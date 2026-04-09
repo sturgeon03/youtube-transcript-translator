@@ -6,7 +6,7 @@ import time
 from deep_translator import GoogleTranslator
 
 from ..glossary.protector import prepare_text_for_translation
-from ..normalize.regroup import build_display_friendly_subtitles, merge_text_segments
+from ..normalize.regroup import merge_text_segments
 from ..normalize.text_cleaner import normalize_text, words
 from ..postprocess.restore import restore_translation_text
 from ..transcript.models import TranscriptSegment
@@ -88,13 +88,11 @@ class GoogleTranslationBackend(TranslationBackend):
         self,
         segments: list[TranscriptSegment],
         *,
-        wrap_width: int,
         batch_size: int,
         glossary: dict[str, str],
     ) -> list[TranscriptSegment]:
         translator = GoogleTranslator(source="en", target="ko")
         translated: list[TranscriptSegment] = []
-        next_index = 1
 
         for offset in range(0, len(segments), batch_size):
             batch = segments[offset : offset + batch_size]
@@ -106,15 +104,20 @@ class GoogleTranslationBackend(TranslationBackend):
                 replacements_per_text.append(replacements)
             translated_texts = translate_batch_google(translator, prepared_texts)
             for segment, text, replacements in zip(batch, translated_texts, replacements_per_text):
-                text = restore_translation_text(text, replacements)
-                built_segments = build_display_friendly_subtitles(
-                    segment,
-                    text=text,
-                    wrap_width=wrap_width,
-                    start_index=next_index,
+                restored = restore_translation_text(text, replacements)
+                translated.append(
+                    TranscriptSegment(
+                        index=segment.index,
+                        start=segment.start,
+                        end=segment.end,
+                        text=normalize_text(restored),
+                        source="google_translation",
+                        metadata={"backend": "google"},
+                    )
                 )
-                translated.extend(built_segments)
-                next_index += len(built_segments)
-            print(f"Translated {min(offset + batch_size, len(segments))}/{len(segments)} groups", flush=True)
+            print(
+                f"Translated {min(offset + batch_size, len(segments))}/{len(segments)} groups with google draft mode",
+                flush=True,
+            )
             time.sleep(0.4)
         return translated

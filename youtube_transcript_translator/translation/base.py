@@ -13,7 +13,6 @@ class TranslationBackend(ABC):
         self,
         segments: list[TranscriptSegment],
         *,
-        wrap_width: int,
         batch_size: int,
         glossary: dict[str, str],
     ) -> list[TranscriptSegment]:

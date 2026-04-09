@@ -43,27 +43,25 @@ class TranslationPipelineTests(unittest.TestCase):
                         max_gap_seconds=0.75,
                         transcript=TranscriptConfig(
                             source_mode="auto",
-                            backend="local",
-                            openai_model="gpt-4o-transcribe-diarize",
                             language="en",
                             local_model="small.en",
                             local_device="cpu",
                             local_compute_type="int8",
-                            timeout_seconds=30.0,
-                            chunk_seconds=600.0,
-                            openai_api_key_env="OPENAI_API_KEY",
                         ),
                         translation=TranslationConfig(
-                            backend="google",
-                            batch_size=40,
+                            backend="local_mt",
+                            batch_size=8,
                             wrap_width=24,
                             glossary_path=None,
                             glossary_profile=None,
                             glossary_registry_path=None,
-                            openai_model="gpt-5.4-mini",
-                            openai_reasoning_effort="low",
-                            openai_api_key_env="OPENAI_API_KEY",
-                            openai_timeout_seconds=30.0,
+                            local_model="facebook/nllb-200-distilled-600M",
+                            local_device="cpu",
+                            local_source_lang="eng_Latn",
+                            local_target_lang="kor_Hang",
+                            local_max_input_length=512,
+                            local_max_new_tokens=256,
+                            local_num_beams=4,
                         ),
                         output=OutputConfig(
                             output_path=output_path,
@@ -80,7 +78,9 @@ class TranslationPipelineTests(unittest.TestCase):
 
             self.assertTrue(result.korean_output_path.exists())
             self.assertTrue(review_path.exists())
-            self.assertIn("translated robotics class", output_path.read_text(encoding="utf-8-sig"))
+            self.assertEqual(result.quality_issue_count, 0)
+            self.assertIn("translated robotics", output_path.read_text(encoding="utf-8-sig"))
+            self.assertIn("translated robotics class", review_path.read_text(encoding="utf-8-sig"))
             self.assertIn("Hello robotics class.", review_path.read_text(encoding="utf-8-sig"))
 
 

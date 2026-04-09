@@ -4,18 +4,23 @@ from ..app.config import TranslationConfig
 from ..transcript.models import TranscriptSegment
 from .base import TranslationBackend
 from .google_backend import GoogleTranslationBackend
-from .openai_backend import OpenAITranslationBackend
+from .local_mt_backend import LocalMTTranslationBackend
 
 
 def get_translation_backend(config: TranslationConfig) -> TranslationBackend:
-    if config.backend == "openai":
-        return OpenAITranslationBackend(
-            model=config.openai_model,
-            reasoning_effort=config.openai_reasoning_effort,
-            api_key_env=config.openai_api_key_env,
-            timeout_seconds=config.openai_timeout_seconds,
+    if config.backend == "google":
+        return GoogleTranslationBackend()
+    if config.backend == "local_mt":
+        return LocalMTTranslationBackend(
+            model_name=config.local_model,
+            device=config.local_device,
+            source_lang=config.local_source_lang,
+            target_lang=config.local_target_lang,
+            max_input_length=config.local_max_input_length,
+            max_new_tokens=config.local_max_new_tokens,
+            num_beams=config.local_num_beams,
         )
-    return GoogleTranslationBackend()
+    raise ValueError(f"Unsupported translation backend: {config.backend}")
 
 
 def translate_segments(
@@ -27,7 +32,6 @@ def translate_segments(
     backend = get_translation_backend(config)
     return backend.translate_segments(
         segments,
-        wrap_width=config.wrap_width,
         batch_size=config.batch_size,
         glossary=glossary,
     )
