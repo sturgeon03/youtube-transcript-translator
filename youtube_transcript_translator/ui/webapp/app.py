@@ -266,6 +266,30 @@ def serialize_result(result: PipelineResult, config: PipelineConfig) -> dict[str
     return payload
 
 
+def build_viewer_context(job_store: JobStore, job_id: str) -> dict[str, Any]:
+    snapshot = job_store.snapshot(job_id)
+    result = snapshot.get("result") or {}
+    subtitle_url = result.get("korean_output")
+    if not subtitle_url:
+        raise HTTPException(status_code=409, detail="This job does not have a completed Korean subtitle output yet.")
+
+    request_payload = snapshot.get("request") or {}
+    video_url = request_payload.get("url")
+    video_id = extract_video_id(video_url)
+    if not video_id:
+        raise HTTPException(status_code=400, detail="The completed job does not contain a valid YouTube video id.")
+
+    return {
+        "job_id": snapshot["id"],
+        "created_at": snapshot["created_at"],
+        "video_id": video_id,
+        "video_url": video_url,
+        "subtitle_artifact_url": f"/api/jobs/{job_id}/artifacts/korean_output",
+        "review_artifact_url": f"/api/jobs/{job_id}/artifacts/review_md" if result.get("review_md") else None,
+        "quality_issue_count": result.get("quality_issue_count", "0"),
+    }
+
+
 def run_job(job_store: JobStore, job_id: str, request: JobRequest) -> None:
     job = job_store.get(job_id)
     log_stream = JobLogStream(job, job_store._lock)
@@ -328,6 +352,15 @@ def create_app(*, open_browser: bool = False) -> FastAPI:
                 "default_transcript_source": DEFAULT_TRANSCRIPT_SOURCE,
                 "default_extension_root": str(DEFAULT_EXTENSION_ROOT),
             },
+        )
+
+    @app.get("/jobs/{job_id}/watch", response_class=HTMLResponse)
+    async def watch_job(request: Request, job_id: str) -> HTMLResponse:
+        context = build_viewer_context(job_store, job_id)
+        return templates.TemplateResponse(
+            request,
+            "viewer.html",
+            context,
         )
 
     @app.post("/api/jobs")

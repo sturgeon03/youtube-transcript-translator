@@ -59,6 +59,32 @@ class WebAppTests(unittest.TestCase):
         self.assertEqual(snapshot["progress_percent"], 37.5)
         self.assertEqual(snapshot["progress_detail"], "Downloading translation model")
 
+    def test_watch_page_renders_for_completed_job(self) -> None:
+        app = create_app()
+        job_store = app.state.job_store
+        record = job_store.create(
+            JobRequest(
+                url="https://www.youtube.com/watch?v=uyyBT-MHhLE",
+                translator="local_mt",
+                transcript_source="auto",
+            )
+        )
+        job_store.set_result(
+            record.id,
+            {
+                "korean_output": "C:/tmp/sample.ko.grouped.srt",
+                "quality_issue_count": "2",
+            },
+        )
+
+        client = TestClient(app)
+        response = client.get(f"/jobs/{record.id}/watch")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("번역 자막 시청", response.text)
+        self.assertIn("uyyBT-MHhLE", response.text)
+        self.assertIn(f"/api/jobs/{record.id}/artifacts/korean_output", response.text)
+
 
 if __name__ == "__main__":
     unittest.main()

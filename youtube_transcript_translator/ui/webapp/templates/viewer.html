@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Watch with Overlay</title>
+    <link rel="stylesheet" href="/static/viewer.css" />
+  </head>
+  <body>
+    <main class="layout">
+      <section class="hero">
+        <div>
+          <div class="eyebrow">Watch With Overlay</div>
+          <h1>번역 자막 시청</h1>
+          <p class="lede">완료된 작업의 한국어 SRT를 바로 덮어써서 이 페이지에서 바로 볼 수 있습니다.</p>
+        </div>
+        <div class="actions">
+          <a class="pill-link" href="/">Back to Jobs</a>
+          <a class="pill-link primary" href="{{ video_url }}" target="_blank" rel="noopener noreferrer">Open YouTube</a>
+        </div>
+      </section>
+
+      <section class="meta-panel">
+        <div class="meta-item">
+          <span class="meta-label">Job</span>
+          <span class="meta-value">{{ job_id }}</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Created</span>
+          <span class="meta-value">{{ created_at }}</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Quality warnings</span>
+          <span class="meta-value">{{ quality_issue_count }}</span>
+        </div>
+        {% if review_artifact_url %}
+        <div class="meta-item">
+          <span class="meta-label">Review</span>
+          <a class="meta-link" href="{{ review_artifact_url }}" target="_blank" rel="noopener noreferrer">Open Review MD</a>
+        </div>
+        {% endif %}
+      </section>
+
+      <section class="player-panel">
+        <div class="player-shell">
+          <div id="player"></div>
+          <div id="subtitle-overlay" class="subtitle-overlay">자막을 불러오는 중...</div>
+        </div>
+        <div class="player-note">
+          유튜브 기본 자막은 이 임베드 화면에서 사용하지 않습니다. 생성된 한국어 SRT만 표시합니다.
+        </div>
+      </section>
+    </main>
+
+    <script>
+      window.VIEWER_BOOTSTRAP = {
+        jobId: {{ job_id | tojson }},
+        videoId: {{ video_id | tojson }},
+        subtitleArtifactUrl: {{ subtitle_artifact_url | tojson }},
+      };
+    </script>
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <script src="/static/viewer.js"></script>
+  </body>
+</html>

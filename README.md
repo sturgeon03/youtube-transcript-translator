@@ -104,6 +104,7 @@ The UI currently supports:
 - glossary profile selection
 - optional Chrome overlay registration
 - job logs and result artifact links
+- a built-in `Watch with Overlay` page for completed jobs, useful when the UI runs on a separate GPU PC
 
 ## Basic usage
 

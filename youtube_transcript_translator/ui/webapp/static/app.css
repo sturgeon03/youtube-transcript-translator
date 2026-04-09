@@ -256,6 +256,11 @@ button:disabled {
   font-weight: 600;
 }
 
+.result-links a.primary-link {
+  background: var(--accent);
+  color: #fff;
+}
+
 .logs {
   min-height: 320px;
   max-height: 480px;

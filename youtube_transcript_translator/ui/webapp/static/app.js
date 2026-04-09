@@ -58,10 +58,38 @@ function setBadge(status) {
   jobBadge.className = `badge ${status}`;
 }
 
-function renderLinks(jobId, result) {
+function appendActionLink({ href, text, newTab = true, className = "" }) {
+  const link = document.createElement("a");
+  link.href = href;
+  link.textContent = text;
+  if (newTab) {
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+  }
+  if (className) {
+    link.classList.add(className);
+  }
+  resultLinks.appendChild(link);
+}
+
+function renderLinks(jobId, result, snapshot) {
   resultLinks.innerHTML = "";
   if (!result) {
     return;
+  }
+
+  if (snapshot?.status === "completed") {
+    appendActionLink({
+      href: `/jobs/${jobId}/watch`,
+      text: "Watch with Overlay",
+      className: "primary-link",
+    });
+    if (snapshot.request?.url) {
+      appendActionLink({
+        href: snapshot.request.url,
+        text: "Open YouTube",
+      });
+    }
   }
 
   const labels = {
@@ -77,11 +105,10 @@ function renderLinks(jobId, result) {
     if (!result[key]) {
       return;
     }
-    const link = document.createElement("a");
-    link.href = `/api/jobs/${jobId}/artifacts/${key}`;
-    link.textContent = label;
-    link.target = "_blank";
-    resultLinks.appendChild(link);
+    appendActionLink({
+      href: `/api/jobs/${jobId}/artifacts/${key}`,
+      text: label,
+    });
   });
 }
 
@@ -102,7 +129,7 @@ function renderJob(snapshot) {
   setBadge(snapshot.status);
   jobMeta.textContent = `job=${snapshot.id} | created=${snapshot.created_at}`;
   renderProgress(snapshot);
-  renderLinks(snapshot.id, snapshot.result);
+  renderLinks(snapshot.id, snapshot.result, snapshot);
 
   const logLines = [];
   if (snapshot.error) {
