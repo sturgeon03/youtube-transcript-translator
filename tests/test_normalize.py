@@ -43,3 +43,22 @@ class NormalizeTests(unittest.TestCase):
 
         self.assertGreaterEqual(len(built), 1)
         self.assertTrue(all(len([line for line in item.text.splitlines() if line.strip()]) <= 2 for item in built))
+
+    def test_regroup_waits_for_sentence_boundary_before_splitting(self) -> None:
+        subtitles = [
+            TranscriptSegment(1, timedelta(seconds=0), timedelta(seconds=1), "This system is"),
+            TranscriptSegment(2, timedelta(seconds=1), timedelta(seconds=2), "underactuated because"),
+            TranscriptSegment(3, timedelta(seconds=2), timedelta(seconds=3), "it has fewer actuators."),
+            TranscriptSegment(4, timedelta(seconds=3), timedelta(seconds=4), "Then we study control."),
+        ]
+
+        grouped = regroup_subtitles(
+            subtitles,
+            max_group_seconds=8.0,
+            max_group_words=4,
+            max_gap_seconds=0.75,
+        )
+
+        self.assertGreaterEqual(len(grouped), 2)
+        self.assertIn("underactuated because it has fewer actuators.", grouped[0].text)
+        self.assertIn("Then we study control.", grouped[1].text)

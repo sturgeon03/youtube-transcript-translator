@@ -10,10 +10,13 @@ from .text_cleaner import normalize_text, seconds_to_timedelta, words
 
 DEFAULT_MAX_DISPLAY_LINES = 2
 DEFAULT_MIN_SPLIT_SECONDS = 1.4
+SENTENCE_BOUNDARY_PATTERN = re.compile(r'[.!?]["\')\]]*$')
+SOFT_BOUNDARY_PATTERN = re.compile(r'[:;]["\')\]]*$')
 
 
 def should_split_group(
     current_text: str,
+    incoming_text: str,
     current_start: float,
     previous_end: float,
     next_start: float,
@@ -25,7 +28,21 @@ def should_split_group(
         return True
     if next_start - current_start > max_group_seconds:
         return True
-    if len(words(current_text)) >= max_group_words:
+    candidate_text = append_with_overlap(current_text, incoming_text)
+    candidate_word_count = len(words(candidate_text))
+    if candidate_word_count < max_group_words:
+        return False
+
+    current_word_count = len(words(current_text))
+    relaxed_limit = max(max_group_words + 8, int(max_group_words * 1.4))
+    has_strong_boundary = bool(SENTENCE_BOUNDARY_PATTERN.search(current_text))
+    has_soft_boundary = bool(SOFT_BOUNDARY_PATTERN.search(current_text))
+
+    if has_strong_boundary:
+        return True
+    if has_soft_boundary and current_word_count >= max(6, int(max_group_words * 0.6)):
+        return True
+    if candidate_word_count >= relaxed_limit:
         return True
     return False
 
@@ -59,7 +76,8 @@ def regroup_subtitles(
             continue
 
         if should_split_group(
-            current_text=candidate_text,
+            current_text=current_text,
+            incoming_text=text,
             current_start=current_start.total_seconds(),
             previous_end=current_end.total_seconds(),
             next_start=start_seconds,

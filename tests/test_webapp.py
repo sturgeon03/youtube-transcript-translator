@@ -84,6 +84,7 @@ class WebAppTests(unittest.TestCase):
         self.assertIn("번역 자막 시청", response.text)
         self.assertIn("uyyBT-MHhLE", response.text)
         self.assertIn(f"/api/jobs/{record.id}/artifacts/korean_output", response.text)
+        self.assertIn("확대 보기", response.text)
 
 
 if __name__ == "__main__":

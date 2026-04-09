@@ -1,5 +1,7 @@
 const bootstrap = window.VIEWER_BOOTSTRAP || {};
 const overlay = document.getElementById("subtitle-overlay");
+const playerShell = document.querySelector(".player-shell");
+const fullscreenButton = document.getElementById("toggle-fullscreen");
 
 let player = null;
 let cues = [];
@@ -126,6 +128,7 @@ function buildPlayer() {
       rel: 0,
       modestbranding: 1,
       cc_load_policy: 0,
+      fs: 0,
     },
     events: {
       onReady() {
@@ -134,6 +137,35 @@ function buildPlayer() {
       },
     },
   });
+}
+
+function updateFullscreenButton() {
+  const fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement;
+  const isFullscreen = fullscreenElement === playerShell;
+  fullscreenButton.textContent = isFullscreen ? "확대 종료" : "확대 보기";
+}
+
+async function toggleFullscreen() {
+  if (!playerShell) {
+    return;
+  }
+
+  const fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement;
+  const isFullscreen = fullscreenElement === playerShell;
+  if (isFullscreen) {
+    if (document.exitFullscreen) {
+      await document.exitFullscreen();
+    } else if (document.webkitExitFullscreen) {
+      document.webkitExitFullscreen();
+    }
+    return;
+  }
+
+  if (playerShell.requestFullscreen) {
+    await playerShell.requestFullscreen();
+  } else if (playerShell.webkitRequestFullscreen) {
+    playerShell.webkitRequestFullscreen();
+  }
 }
 
 window.onYouTubeIframeAPIReady = async function onYouTubeIframeAPIReady() {
@@ -146,6 +178,13 @@ window.onYouTubeIframeAPIReady = async function onYouTubeIframeAPIReady() {
     overlay.classList.add("ready");
   }
 };
+
+fullscreenButton?.addEventListener("click", () => {
+  void toggleFullscreen();
+});
+
+document.addEventListener("fullscreenchange", updateFullscreenButton);
+document.addEventListener("webkitfullscreenchange", updateFullscreenButton);
 
 window.addEventListener("beforeunload", () => {
   if (rafId) {

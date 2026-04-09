@@ -106,6 +106,8 @@ The UI currently supports:
 - job logs and result artifact links
 - a built-in `Watch with Overlay` page for completed jobs, useful when the UI runs on a separate GPU PC
 
+Inside the built-in viewer, use the page's own fullscreen button instead of the YouTube iframe fullscreen button so the generated subtitle overlay stays visible.
+
 ## Basic usage
 
 Recommended local-only workflow:
