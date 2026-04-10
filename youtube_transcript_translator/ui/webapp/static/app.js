@@ -17,10 +17,14 @@ const phaseLabels = {
   loading_glossary: "용어집 로드",
   loading_input: "로컬 입력 로드",
   resolving_transcript: "영어 자막 확인",
+  checking_youtube_subtitles: "유튜브 자막 확인",
+  downloading_audio: "오디오 다운로드",
+  loading_asr_model: "전사 모델 로딩",
+  transcribing_audio: "로컬 전사",
   english_ready: "영어 자막 준비 완료",
   grouping_subtitles: "자막 그룹화",
-  downloading_model: "모델 다운로드",
-  loading_model: "모델 로딩",
+  downloading_model: "번역 모델 다운로드",
+  loading_model: "번역 모델 로딩",
   translating: "번역",
   quality_checks: "품질 검사",
   rendering_subtitles: "표시용 자막 생성",
@@ -32,6 +36,7 @@ const phaseLabels = {
 
 let currentJobId = null;
 let pollTimer = null;
+let pollGeneration = 0;
 
 function clampProgress(value) {
   if (typeof value !== "number" || Number.isNaN(value)) {
@@ -156,22 +161,33 @@ function renderJob(snapshot) {
   }
 }
 
-async function pollJob(jobId) {
+async function pollJob(jobId, generation) {
   const response = await fetch(`/api/jobs/${jobId}`);
+  if (generation !== pollGeneration || jobId !== currentJobId) {
+    return;
+  }
   if (!response.ok) {
     formStatus.textContent = "작업 상태 조회에 실패했습니다.";
     submitButton.disabled = false;
     return;
   }
   const snapshot = await response.json();
+  if (generation !== pollGeneration || jobId !== currentJobId) {
+    return;
+  }
   renderJob(snapshot);
   if (snapshot.status === "queued" || snapshot.status === "running") {
-    pollTimer = setTimeout(() => pollJob(jobId), 1200);
+    pollTimer = setTimeout(() => pollJob(jobId, generation), 1200);
   }
 }
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (pollTimer) {
+    clearTimeout(pollTimer);
+    pollTimer = null;
+  }
+  pollGeneration += 1;
   submitButton.disabled = true;
   formStatus.textContent = "작업 생성 중...";
   setBadge("queued");
@@ -218,5 +234,5 @@ form.addEventListener("submit", async (event) => {
   const created = await response.json();
   currentJobId = created.job_id;
   formStatus.textContent = `작업 시작: ${currentJobId}`;
-  pollJob(currentJobId);
+  pollJob(currentJobId, pollGeneration);
 });

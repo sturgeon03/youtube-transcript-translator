@@ -182,6 +182,8 @@ class JobStore:
     ) -> None:
         with self._lock:
             job = self._jobs[job_id]
+            if job.status in {"completed", "failed"}:
+                return
             job.phase = stage
             if progress is not None:
                 job.progress_percent = max(0.0, min(100.0, progress))

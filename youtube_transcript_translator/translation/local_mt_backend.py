@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -264,6 +265,11 @@ def translate_batch_with_bundle(
         max_new_tokens=max_new_tokens,
         num_beams=num_beams,
     )
+    generation_config = getattr(model, "generation_config", None)
+    if generation_config is not None:
+        generation_config = copy.deepcopy(generation_config)
+        generation_config.max_length = None
+        generation_kwargs["generation_config"] = generation_config
 
     with torch.inference_mode():
         generated = model.generate(**encoded, **generation_kwargs)

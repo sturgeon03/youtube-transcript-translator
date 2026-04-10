@@ -61,6 +61,33 @@ class WebAppTests(unittest.TestCase):
         self.assertEqual(snapshot["progress_percent"], 37.5)
         self.assertEqual(snapshot["progress_detail"], "Downloading translation model")
 
+    def test_completed_job_ignores_late_progress_updates(self) -> None:
+        app = create_app()
+        job_store = app.state.job_store
+        record = job_store.create(
+            JobRequest(
+                url="https://www.youtube.com/watch?v=uyyBT-MHhLE",
+                translator="local_mt",
+                transcript_source="auto",
+            )
+        )
+        job_store.update_status(record.id, "running")
+        job_store.update_status(record.id, "completed")
+
+        job_store.update_progress(
+            record.id,
+            stage="resolving_transcript",
+            progress=12.0,
+            detail="Stale update should be ignored",
+        )
+
+        snapshot = job_store.snapshot(record.id)
+
+        self.assertEqual(snapshot["status"], "completed")
+        self.assertEqual(snapshot["phase"], "completed")
+        self.assertEqual(snapshot["progress_percent"], 100.0)
+        self.assertEqual(snapshot["progress_detail"], "Pipeline completed")
+
     def test_watch_page_renders_for_completed_job(self) -> None:
         app = create_app()
         job_store = app.state.job_store

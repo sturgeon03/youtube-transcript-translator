@@ -119,6 +119,23 @@ def run_pipeline(
             progress=12.0,
             detail="Resolving English transcript from YouTube",
         )
+
+        def transcript_progress(
+            *,
+            stage: str,
+            progress: float | None = None,
+            detail: str | None = None,
+        ) -> None:
+            mapped_progress = 12.0
+            if progress is not None:
+                mapped_progress = 12.0 + max(0.0, min(100.0, progress)) * 0.16
+            report_progress(
+                progress_callback,
+                stage=stage,
+                progress=mapped_progress,
+                detail=detail,
+            )
+
         english_segments, input_reference = resolve_transcript_from_url(
             config.url,
             target_dir=target_dir,
@@ -129,6 +146,7 @@ def run_pipeline(
             local_transcription_compute_type=config.transcript.local_compute_type,
             english_output=config.output.english_output,
             english_text_output=config.output.english_text_output,
+            progress_callback=transcript_progress,
         )
     else:
         raise ValueError("No input subtitle source was resolved.")

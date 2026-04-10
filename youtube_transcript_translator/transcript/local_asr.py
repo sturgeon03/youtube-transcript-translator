@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from ..transcript.models import TranscriptSegment
+from ..translation.base import ProgressCallback, report_progress
 
 try:
     from faster_whisper import WhisperModel
@@ -40,6 +41,7 @@ def transcribe_audio_with_faster_whisper(
     device: str,
     compute_type: str,
     vad_filter: bool = True,
+    progress_callback: ProgressCallback | None = None,
 ) -> list[TranscriptSegment]:
     _require_faster_whisper()
 
@@ -48,11 +50,30 @@ def transcribe_audio_with_faster_whisper(
     if not audio_path.is_file():
         raise IsADirectoryError(f"Expected an audio file, got a directory: {audio_path}")
 
+    report_progress(
+        progress_callback,
+        stage="loading_asr_model",
+        progress=45.0,
+        detail=f"Loading local ASR model {model_size}",
+    )
     model = _load_model(model_size, device, compute_type)
+    report_progress(
+        progress_callback,
+        stage="loading_asr_model",
+        progress=58.0,
+        detail=f"Local ASR model ready on {device}",
+    )
     segments, _info = model.transcribe(
         str(audio_path),
         language=language,
         vad_filter=vad_filter,
+    )
+    total_duration = float(getattr(_info, "duration", 0.0) or 0.0)
+    report_progress(
+        progress_callback,
+        stage="transcribing_audio",
+        progress=60.0,
+        detail="Transcribing audio with faster-whisper",
     )
 
     subtitles: list[TranscriptSegment] = []
@@ -60,6 +81,15 @@ def transcribe_audio_with_faster_whisper(
         text = segment.text.strip()
         if not text:
             continue
+        if total_duration > 0:
+            segment_end = max(0.0, float(segment.end))
+            mapped_progress = 60.0 + min(40.0, (segment_end / total_duration) * 40.0)
+            report_progress(
+                progress_callback,
+                stage="transcribing_audio",
+                progress=mapped_progress,
+                detail=f"Transcribed audio up to {segment_end:.1f}s / {total_duration:.1f}s",
+            )
         subtitles.append(
             TranscriptSegment(
                 index=len(subtitles) + 1,
@@ -70,4 +100,10 @@ def transcribe_audio_with_faster_whisper(
             )
         )
 
+    report_progress(
+        progress_callback,
+        stage="transcribing_audio",
+        progress=100.0,
+        detail=f"Finished local transcription with {len(subtitles)} subtitle segments",
+    )
     return subtitles
