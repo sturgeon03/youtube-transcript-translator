@@ -50,6 +50,23 @@ TEMPLATES_DIR = APP_ROOT / "templates"
 STATIC_DIR = APP_ROOT / "static"
 DEFAULT_JOB_ROOT = Path.cwd() / "artifacts" / "webui"
 DEFAULT_EXTENSION_ROOT = Path(__file__).resolve().parents[1] / "chrome_overlay"
+LOCAL_TRANSCRIPTION_MODEL_PRESETS = [
+    {
+        "value": "small.en",
+        "label": "small.en",
+        "description": "Fastest local ASR, lower accuracy on long technical lectures.",
+    },
+    {
+        "value": "medium.en",
+        "label": "medium.en",
+        "description": "Recommended quality baseline for technical English lectures.",
+    },
+    {
+        "value": "large-v3",
+        "label": "large-v3",
+        "description": "Highest local ASR quality, best on stronger GPUs.",
+    },
+]
 
 
 class JobRequest(BaseModel):
@@ -350,6 +367,8 @@ def create_app(*, open_browser: bool = False) -> FastAPI:
                 "default_translator": DEFAULT_TRANSLATOR,
                 "default_local_model": DEFAULT_LOCAL_TRANSLATION_MODEL,
                 "default_transcript_source": DEFAULT_TRANSCRIPT_SOURCE,
+                "default_local_transcription_model": DEFAULT_LOCAL_TRANSCRIPTION_MODEL,
+                "local_transcription_model_presets": LOCAL_TRANSCRIPTION_MODEL_PRESETS,
                 "default_extension_root": str(DEFAULT_EXTENSION_ROOT),
             },
         )

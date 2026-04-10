@@ -28,10 +28,11 @@
             <label class="field">
               <span>Transcript source</span>
               <select id="transcript_source" name="transcript_source">
-                <option value="auto" {% if default_transcript_source == "auto" %}selected{% endif %}>auto</option>
+                <option value="auto" {% if default_transcript_source == "auto" %}selected{% endif %}>auto (YouTube subtitles first)</option>
                 <option value="youtube">youtube only</option>
-                <option value="transcribe">force local ASR</option>
+                <option value="transcribe">transcribe (force local ASR)</option>
               </select>
+              <span class="field-help">최고 품질이 필요하면 보통 `transcribe`가 더 낫고, 빠른 기본값은 `auto`입니다.</span>
             </label>
 
             <label class="field">
@@ -70,7 +71,14 @@
             <div class="grid two">
               <label class="field">
                 <span>Local transcription model</span>
-                <input id="local_transcription_model" name="local_transcription_model" type="text" value="small.en" />
+                <select id="local_transcription_model" name="local_transcription_model">
+                  {% for preset in local_transcription_model_presets %}
+                  <option value="{{ preset.value }}" {% if default_local_transcription_model == preset.value %}selected{% endif %}>
+                    {{ preset.label }} - {{ preset.description }}
+                  </option>
+                  {% endfor %}
+                </select>
+                <span class="field-help">RTX 4060 8GB면 `medium.en`이 안정적이고, 시간 여유가 있으면 `large-v3`도 시도할 만합니다.</span>
               </label>
               <label class="field">
                 <span>Wrap width</span>

@@ -17,6 +17,8 @@ class WebAppTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("YouTube URL", response.text)
         self.assertIn("local_mt", response.text)
+        self.assertIn("transcribe (force local ASR)", response.text)
+        self.assertIn("medium.en", response.text)
 
     def test_create_job_returns_job_id(self) -> None:
         client = TestClient(create_app())

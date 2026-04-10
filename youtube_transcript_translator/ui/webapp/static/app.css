@@ -77,6 +77,13 @@ summary,
   margin-bottom: 16px;
 }
 
+.field-help {
+  display: block;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
 .field input,
 .field select {
   width: 100%;
