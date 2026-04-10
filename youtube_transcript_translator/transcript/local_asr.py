@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import threading
+import time
 from datetime import timedelta
 from functools import lru_cache
 from pathlib import Path
@@ -56,12 +58,51 @@ def transcribe_audio_with_faster_whisper(
         progress=45.0,
         detail=f"Loading local ASR model {model_size}",
     )
-    model = _load_model(model_size, device, compute_type)
+    print(
+        f"[asr] Loading local ASR model {model_size} on {device} "
+        f"(first run may take a few minutes while faster-whisper downloads the model)",
+        flush=True,
+    )
+
+    stop_heartbeat = threading.Event()
+    load_started_at = time.monotonic()
+
+    def emit_loading_heartbeat() -> None:
+        while not stop_heartbeat.wait(5.0):
+            elapsed = int(time.monotonic() - load_started_at)
+            # Keep the loading stage visibly alive without claiming completion.
+            heartbeat_progress = min(57.0, 45.0 + min(12.0, elapsed / 5.0))
+            report_progress(
+                progress_callback,
+                stage="loading_asr_model",
+                progress=heartbeat_progress,
+                detail=f"Loading local ASR model {model_size} ({elapsed}s elapsed)",
+            )
+            print(
+                f"[asr] Still loading local ASR model {model_size} ({elapsed}s elapsed)",
+                flush=True,
+            )
+
+    heartbeat_thread = threading.Thread(
+        target=emit_loading_heartbeat,
+        daemon=True,
+        name=f"asr-load-{model_size}",
+    )
+    heartbeat_thread.start()
+    try:
+        model = _load_model(model_size, device, compute_type)
+    finally:
+        stop_heartbeat.set()
     report_progress(
         progress_callback,
         stage="loading_asr_model",
         progress=58.0,
         detail=f"Local ASR model ready on {device}",
+    )
+    elapsed = int(time.monotonic() - load_started_at)
+    print(
+        f"[asr] Local ASR model {model_size} ready on {device} after {elapsed}s",
+        flush=True,
     )
     segments, _info = model.transcribe(
         str(audio_path),
